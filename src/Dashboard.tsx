@@ -37,6 +37,8 @@ interface RosterSettings {
   fpts_decimal?: number;
   fpts_against?: number;
   fpts_against_decimal?: number;
+  ppts?: number;
+  ppts_decimal?: number;
   waiver_position?: number;
   waiver_budget_used?: number;
   total_moves?: number;
@@ -89,7 +91,7 @@ interface PlayerDBSchema extends DBSchema {
 }
 
 const LEAGUE_ID = '1050831680350568448'; // <<<2024   vs  2025>>>'1210364682523656192';
-const PLAYER_CACHE_HOURS = 6;
+const PLAYER_CACHE_HOURS = 24;
 const BATCH_SIZE = 500;
 const PLAYER_DATA_VERSION = '1.0'; // Version for cache invalidation
 
@@ -118,7 +120,7 @@ const DynastyDashboardV2: React.FC = () => {
       const metadata = await db.get('metadata', 'lastUpdate');
       if (!metadata) return true;
       
-      const hoursElapsed = (Date.now() - metadata.lastUpdated) / (1000 * 60 * 60);
+      const hoursElapsed = (Date.now() - metadata.lastUpdated) / (1000 * 60 * 60); // Convert milliseconds to hours
       const isVersionMismatch = metadata.version !== PLAYER_DATA_VERSION;
       
       return hoursElapsed >= PLAYER_CACHE_HOURS || isVersionMismatch;
@@ -137,6 +139,7 @@ const DynastyDashboardV2: React.FC = () => {
       }
       
       const data = await response.json();
+      console.log({data})
       
       // Process players in batches to not block the main thread
       const playerIds = Object.keys(data);
@@ -306,6 +309,12 @@ const DynastyDashboardV2: React.FC = () => {
     return (settings.fpts + (settings.fpts_decimal || 0) / 100).toFixed(2);
   };
 
+  const getManagerEfficiency = (settings: RosterSettings) => {
+    const fpts = settings.fpts + (settings.fpts_decimal || 0);
+    const ppts = settings.ppts || 0 + (settings.ppts_decimal || 0);
+    return ppts > 0 ? ((fpts / ppts) * 100).toFixed(1) + '%' : '0.00%';
+  };
+
   const formatHeight = (height: string | undefined): string => {
     if (!height) return 'N/A';
     const inches = parseInt(height);
@@ -363,6 +372,9 @@ const DynastyDashboardV2: React.FC = () => {
               </div>
               <div className="text-sm text-gray-400">
                 Points: {getPoints(roster.settings)}
+              </div>
+              <div className="text-sm text-gray-400">
+                Efficiency: {getManagerEfficiency(roster.settings)}
               </div>
             </div>
             {expandedTeam === roster.roster_id ? (
