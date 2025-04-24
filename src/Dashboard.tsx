@@ -79,6 +79,16 @@ interface TeamData {
   bench: Player[];
 }
 
+interface PlayerOwnershipStats {
+  owned: number;
+  started: number;
+}
+
+// endpoint for PlayerOwnershipData: https://api.sleeper.com/players/nfl/research/regular/{year}/1?league_type=2 // make year 2024
+interface PlayerOwnershipData {
+  [playerId: string]: PlayerOwnershipStats;
+}
+
 interface PlayerDBSchema extends DBSchema {
   players: {
     key: string;
