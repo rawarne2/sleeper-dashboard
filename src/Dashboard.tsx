@@ -138,22 +138,30 @@ const DynastyDashboardV2: React.FC = () => {
         throw new Error(`Failed to fetch players: ${response.status} ${response.statusText}`);
       }
       
-      const data = await response.json();
-      console.log({data})
+      const data: Record<string, Player> = await response.json();
+      
+      // Relevant positions for fantasy football
+      const relevantPositions = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
       
       // Process players in batches to not block the main thread
       const playerIds = Object.keys(data);
-      const totalPlayers = playerIds.length;
       
       const tx = db.transaction('players', 'readwrite');
       
-      for (let i = 0; i < totalPlayers; i += BATCH_SIZE) {
+      for (let i = 0; i < playerIds.length; i += BATCH_SIZE) {
         const batch = playerIds.slice(i, i + BATCH_SIZE);
         await Promise.all(
           batch.map(id => {
             const player = data[id];
-            if (player.status === 'Active') {
+
+            if (player.status === 'Active' && relevantPositions.has(player.position)) {
               player.player_id = id;
+              const height = player.height ? parseInt(player.height, 10) : undefined;
+              const isHeightValid = height && !isNaN(height) && height > 50 && height < 99;
+              
+              if (!isHeightValid) {
+                player.height = undefined;
+              }
               return tx.store.put(player);
             }
             return Promise.resolve();
