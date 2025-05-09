@@ -8,102 +8,22 @@ import {
   CalendarIcon,
   CakeIcon
 } from '@heroicons/react/24/outline';
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { openDB, IDBPDatabase } from 'idb';
+import {
+  Player,
+  RosterSettings,
+  LeagueData,
+  TeamData,
+  PlayerOwnershipData,
+  PlayerDBSchema
+} from './types';
 
-// Types
-interface Player {
-  player_id: string;
-  first_name: string;
-  last_name: string;
-  team: string;
-  position: string;
-  age?: number;
-  height?: string;
-  weight?: string;
-  years_exp?: number;
-  college?: string;
-  fantasy_positions: string[];
-  status: string;
-  injury_status?: string | null;
-  number?: number;
-  depth_chart_position?: number;
-}
-
-interface RosterSettings {
-  wins: number;
-  losses: number;
-  ties: number;
-  fpts: number;
-  fpts_decimal?: number;
-  fpts_against?: number;
-  fpts_against_decimal?: number;
-  ppts?: number;
-  ppts_decimal?: number;
-  waiver_position?: number;
-  waiver_budget_used?: number;
-  total_moves?: number;
-}
-
-interface Roster {
-  roster_id: number;
-  owner_id: string;
-  league_id?: string;
-  starters: string[];
-  players: string[];
-  reserve?: string[];
-  settings: RosterSettings;
-}
-
-interface User {
-  user_id: string;
-  username?: string;
-  display_name: string;
-  avatar?: string;
-  metadata?: {
-    team_name?: string;
-  };
-  is_owner?: boolean;
-}
-
-interface LeagueData {
-  rosters: Roster[];
-  users: User[];
-  players: Record<string, Player>;
-}
-
-interface TeamData {
-  roster: Roster;
-  user: User;
-  players: Player[];
-  starters: Player[];
-  bench: Player[];
-}
-
-interface PlayerOwnershipStats {
-  owned: number;
-  started: number;
-}
-
-// endpoint for PlayerOwnershipData: https://api.sleeper.com/players/nfl/research/regular/{year}/1?league_type=2 // make year 2024
-interface PlayerOwnershipData {
-  [playerId: string]: PlayerOwnershipStats;
-}
-
-interface PlayerDBSchema extends DBSchema {
-  players: {
-    key: string;
-    value: Player;
-  };
-  metadata: {
-    key: string;
-    value: { lastUpdated: number; key: string; version: string };
-  };
-}
-
+// Constants
 const LEAGUE_ID = '1050831680350568448'; // <<<2024   vs  2025>>>'1210364682523656192';
 const PLAYER_CACHE_HOURS = 24;
 const BATCH_SIZE = 500;
 const PLAYER_DATA_VERSION = '1.0'; // Version for cache invalidation
+const CURRENT_SEASON = 2024;
 
 const DynastyDashboardV2: React.FC = () => {
   const [leagueData, setLeagueData] = useState<LeagueData | null>(null);
@@ -111,7 +31,7 @@ const DynastyDashboardV2: React.FC = () => {
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const isSmallScreen = typeof window !== 'undefined' ? window.innerWidth < 640 : false;
 
   // Initialize IndexedDB
@@ -120,26 +40,85 @@ const DynastyDashboardV2: React.FC = () => {
       upgrade(db) {
         db.createObjectStore('players', { keyPath: 'player_id' });
         db.createObjectStore('metadata', { keyPath: 'key' });
+        db.createObjectStore('ownership', { keyPath: 'player_id' });
       },
     });
   }, []);
-  
+
   // Check if players data needs refresh
   const shouldRefreshPlayers = useCallback(async (db: IDBPDatabase<PlayerDBSchema>) => {
     try {
       const metadata = await db.get('metadata', 'lastUpdate');
       if (!metadata) return true;
-      
+
       const hoursElapsed = (Date.now() - metadata.lastUpdated) / (1000 * 60 * 60); // Convert milliseconds to hours
       const isVersionMismatch = metadata.version !== PLAYER_DATA_VERSION;
-      
+
       return hoursElapsed >= PLAYER_CACHE_HOURS || isVersionMismatch;
     } catch (err) {
       console.error('Error checking player refresh:', err);
       return true;
     }
   }, []);
-  
+
+  // Fetch player ownership data
+  const fetchPlayerOwnershipData = useCallback(async (db: IDBPDatabase<PlayerDBSchema>) => {
+    try {
+      const response = await fetch(`https://api.sleeper.app/players/nfl/research/regular/${CURRENT_SEASON}/1?league_type=2`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch player ownership data: ${response.status} ${response.statusText}`);
+      }
+
+      const data: PlayerOwnershipData = await response.json();
+
+      // Store the ownership data in IndexedDB
+      const tx = db.transaction('ownership', 'readwrite');
+
+      const playerIds = Object.keys(data);
+      for (let i = 0; i < playerIds.length; i += BATCH_SIZE) {
+        const batch = playerIds.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          batch.map(id => {
+            const ownershipData = data[id];
+            return tx.store.put({
+              player_id: id,
+              owned: ownershipData.owned,
+              started: ownershipData.started
+            });
+          })
+        );
+      }
+
+      await tx.done;
+      return data;
+    } catch (err) {
+      console.error('Error fetching player ownership data:', err);
+      return {};
+    }
+  }, []);
+
+  // Get player ownership data from IndexedDB
+  const getPlayerOwnershipFromDB = useCallback(async (db: IDBPDatabase<PlayerDBSchema>) => {
+    try {
+      const ownershipData = await db.getAll('ownership');
+
+      const ownershipMap: PlayerOwnershipData = {};
+      ownershipData.forEach((data) => {
+        if (data && data.player_id) {
+          ownershipMap[data.player_id] = {
+            owned: data.owned,
+            started: data.started
+          };
+        }
+      });
+
+      return ownershipMap;
+    } catch (err) {
+      console.error('Error getting ownership data from DB:', err);
+      return {};
+    }
+  }, []);
+
   // Fetch players from API and store in IndexedDB
   const fetchAndStorePlayers = useCallback(async (db: IDBPDatabase<PlayerDBSchema>) => {
     try {
@@ -147,17 +126,17 @@ const DynastyDashboardV2: React.FC = () => {
       if (!response.ok) {
         throw new Error(`Failed to fetch players: ${response.status} ${response.statusText}`);
       }
-      
+
       const data: Record<string, Player> = await response.json();
-      
+
       // Relevant positions for fantasy football
       const relevantPositions = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
-      
+
       // Process players in batches to not block the main thread
       const playerIds = Object.keys(data);
-      
+
       const tx = db.transaction('players', 'readwrite');
-      
+
       for (let i = 0; i < playerIds.length; i += BATCH_SIZE) {
         const batch = playerIds.slice(i, i + BATCH_SIZE);
         await Promise.all(
@@ -168,7 +147,7 @@ const DynastyDashboardV2: React.FC = () => {
               player.player_id = id;
               const height = player.height ? parseInt(player.height, 10) : undefined;
               const isHeightValid = height && !isNaN(height) && height > 50 && height < 99;
-              
+
               if (!isHeightValid) {
                 player.height = undefined;
               }
@@ -178,23 +157,23 @@ const DynastyDashboardV2: React.FC = () => {
           })
         );
       }
-      
+
       await tx.done;
-      
+
       // Update metadata with version
-      await db.put('metadata', { 
-        lastUpdated: Date.now(), 
+      await db.put('metadata', {
+        lastUpdated: Date.now(),
         key: 'lastUpdate',
         version: PLAYER_DATA_VERSION
       });
-      
+
       return data;
     } catch (err) {
       console.error('Error fetching players:', err);
       throw err;
     }
   }, []);
-  
+
   // Get all players from IndexedDB
   const getPlayersFromDB = useCallback(async (db: IDBPDatabase<PlayerDBSchema>) => {
     try {
@@ -202,14 +181,14 @@ const DynastyDashboardV2: React.FC = () => {
       if (!players || players.length === 0) {
         throw new Error('No players found in database');
       }
-      
+
       const playersMap: Record<string, Player> = {};
       players.forEach((player: Player) => {
         if (player && player.player_id) {
           playersMap[player.player_id] = player;
         }
       });
-      
+
       return playersMap;
     } catch (err) {
       console.error('Error getting players from DB:', err);
@@ -225,39 +204,52 @@ const DynastyDashboardV2: React.FC = () => {
         // Initialize players from IndexedDB
         const db = await initDB();
         const needsRefresh = await shouldRefreshPlayers(db);
-        
+
         let playersMap: Record<string, Player> = {};
         if (needsRefresh) {
           console.log('Refreshing player data...');
           await fetchAndStorePlayers(db);
         }
-        
+
         playersMap = await getPlayersFromDB(db);
         if (Object.keys(playersMap).length === 0) {
           throw new Error('Failed to load player data');
         }
-        
+
+        // Fetch player ownership data
+        let ownershipMap: PlayerOwnershipData = {};
+        try {
+          ownershipMap = await getPlayerOwnershipFromDB(db);
+          if (Object.keys(ownershipMap).length === 0) {
+            console.log('Fetching player ownership data...');
+            ownershipMap = await fetchPlayerOwnershipData(db);
+          }
+        } catch (err) {
+          console.error('Error loading player ownership data:', err);
+        }
+
         // Fetch rosters and users in parallel
         const [rostersResponse, usersResponse] = await Promise.all([
           fetch(`https://api.sleeper.app/v1/league/${LEAGUE_ID}/rosters`),
           fetch(`https://api.sleeper.app/v1/league/${LEAGUE_ID}/users`)
         ]);
-        
+
         if (!rostersResponse.ok || !usersResponse.ok) {
           throw new Error('Failed to fetch league data');
         }
-        
+
         const [rostersData, usersData] = await Promise.all([
           rostersResponse.json(),
           usersResponse.json()
         ]);
-        
+
         setLeagueData({
           rosters: rostersData,
           users: usersData,
-          players: playersMap
+          players: playersMap,
+          playerOwnership: ownershipMap
         });
-        
+
       } catch (err) {
         console.error('Error loading data:', err);
         setError('Failed to load league data. Please try again later.');
@@ -265,40 +257,40 @@ const DynastyDashboardV2: React.FC = () => {
         setLoading(false);
       }
     };
-    
+
     fetchData();
-  }, [initDB, shouldRefreshPlayers, fetchAndStorePlayers, getPlayersFromDB]);
-  
+  }, [initDB, shouldRefreshPlayers, fetchAndStorePlayers, getPlayersFromDB, fetchPlayerOwnershipData, getPlayerOwnershipFromDB]);
+
   // Process and organize team data
   const teamsData = useMemo(() => {
     if (!leagueData) return [];
-    
+
     return leagueData.rosters.map(roster => {
       const user = leagueData.users.find(u => u.user_id === roster.owner_id) || {
         user_id: roster.owner_id,
         username: 'Unknown User',
         display_name: 'Unknown',
       };
-      
+
       const players = roster.players
         .map(id => leagueData.players[id])
         .filter(p => p !== undefined);
-      
+
       const starters = roster.starters
         .map(id => leagueData.players[id])
         .filter(p => p !== undefined);
-      
+
       const starterIds = new Set(roster.starters);
       const bench = players.filter(p => !starterIds.has(p.player_id));
-      
+
       return { roster, user, players, starters, bench };
     }).sort((a, b) => {
       // Sort by wins (descending), then points (descending)
       if (b.roster.settings.wins !== a.roster.settings.wins) {
         return b.roster.settings.wins - a.roster.settings.wins;
       }
-      return (b.roster.settings.fpts + (b.roster.settings.fpts_decimal || 0) / 100) - 
-             (a.roster.settings.fpts + (a.roster.settings.fpts_decimal || 0) / 100);
+      return (b.roster.settings.fpts + (b.roster.settings.fpts_decimal || 0) / 100) -
+        (a.roster.settings.fpts + (a.roster.settings.fpts_decimal || 0) / 100);
     });
   }, [leagueData]);
 
@@ -341,13 +333,25 @@ const DynastyDashboardV2: React.FC = () => {
     return `${feet}'${remainingInches}"`;
   };
 
+  const renderPlayerOwnership = (playerId: string) => {
+    if (!leagueData?.playerOwnership?.[playerId]) return null;
+
+    const { owned, started } = leagueData.playerOwnership[playerId];
+    return (
+      <div className="text-xs text-gray-400 flex gap-2">
+        <span>Owned: {owned}%</span>
+        <span>Started: {started}%</span>
+      </div>
+    );
+  };
+
   const TeamPanel = memo(({ teamData, index }: { teamData: TeamData, index: number }) => {
     const { roster, user, starters, bench } = teamData;
-    
+
     return (
       <div className="team-paper">
-        <div 
-          className="team-header p-4 sm:p-5" 
+        <div
+          className="team-header p-4 sm:p-5"
           onClick={() => handleTeamClick(roster.roster_id)}
         >
           <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
@@ -356,8 +360,8 @@ const DynastyDashboardV2: React.FC = () => {
             </div>
             <div className="w-14 h-14 rounded-full bg-background-hover flex-shrink-0 overflow-hidden">
               {user.avatar ? (
-                <img 
-                  alt={user.display_name} 
+                <img
+                  alt={user.display_name}
                   src={`https://sleepercdn.com/avatars/thumbs/${user.avatar}`}
                   className="w-full h-full object-cover"
                 />
@@ -367,7 +371,7 @@ const DynastyDashboardV2: React.FC = () => {
                 </div>
               )}
             </div>
-            
+
             <div className="min-w-0 flex-1 mr-1 sm:mr-2">
               <div className="text-xl font-medium truncate">
                 {user.metadata?.team_name || user.display_name}
@@ -382,7 +386,7 @@ const DynastyDashboardV2: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center flex-shrink-0">
             <div className="text-right mr-2">
               <div className="text-base">
@@ -402,7 +406,7 @@ const DynastyDashboardV2: React.FC = () => {
             )}
           </div>
         </div>
-        
+
         {expandedTeam === roster.roster_id && (
           <>
             <div className="border-t border-border-subtle"></div>
@@ -423,7 +427,7 @@ const DynastyDashboardV2: React.FC = () => {
                   <tbody>
                     {starters.map((player) => (
                       <React.Fragment key={player.player_id}>
-                        <tr 
+                        <tr
                           className="hover:bg-background-hover cursor-pointer border-b border-border-subtle"
                           onClick={() => handlePlayerClick(player.player_id)}
                         >
@@ -434,6 +438,7 @@ const DynastyDashboardV2: React.FC = () => {
                             <div className="text-sm">
                               {player.first_name} {player.last_name}
                             </div>
+                            {renderPlayerOwnership(player.player_id)}
                           </td>
                           {!isSmallScreen && (
                             <td className="p-2">
@@ -511,7 +516,7 @@ const DynastyDashboardV2: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-                
+
               <div className="font-bold text-gray-200 mb-2">
                 Bench
               </div>
@@ -528,7 +533,7 @@ const DynastyDashboardV2: React.FC = () => {
                   <tbody>
                     {bench.map((player) => (
                       <React.Fragment key={player.player_id}>
-                        <tr 
+                        <tr
                           className="hover:bg-background-hover cursor-pointer border-b border-border-subtle"
                           onClick={() => handlePlayerClick(player.player_id)}
                         >
@@ -539,6 +544,7 @@ const DynastyDashboardV2: React.FC = () => {
                             <div className="text-sm">
                               {player.first_name} {player.last_name}
                             </div>
+                            {renderPlayerOwnership(player.player_id)}
                           </td>
                           {!isSmallScreen && (
                             <td className="p-2">
@@ -641,7 +647,7 @@ const DynastyDashboardV2: React.FC = () => {
           </div>
         </div>
       </div>
-      
+
       <div className="container mx-auto p-2 sm:p-4 md:p-6 flex-1 max-w-6xl">
         {loading ? (
           <div className="flex justify-center items-center h-[50vh]">
@@ -661,7 +667,7 @@ const DynastyDashboardV2: React.FC = () => {
           </div>
         )}
       </div>
-      
+
       <div className="py-3 px-2 mt-auto bg-background-paper/70 text-center">
         <div className="text-sm text-gray-400">
           Sleeper Dynasty League Dashboard • League ID: {LEAGUE_ID}
