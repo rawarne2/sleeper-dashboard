@@ -1,3 +1,4 @@
+// src/Dashboard.tsx
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import {
   ChevronUpIcon,
@@ -17,6 +18,7 @@ import {
   PlayerOwnershipData,
   PlayerDBSchema
 } from './types';
+import { fetchPlayers, storePlayers } from './playerFunctions';
 
 // Constants
 const LEAGUE_ID = '1050831680350568448'; // <<<2024   vs  2025>>>'1210364682523656192';
@@ -120,56 +122,14 @@ const DynastyDashboardV2: React.FC = () => {
   }, []);
 
   // Fetch players from API and store in IndexedDB
+  // Fetch and store players (combined operation for backward compatibility)
   const fetchAndStorePlayers = useCallback(async (db: IDBPDatabase<PlayerDBSchema>) => {
     try {
-      const response = await fetch('https://api.sleeper.app/v1/players/nfl');
-      if (!response.ok) {
-        throw new Error(`Failed to fetch players: ${response.status} ${response.statusText}`);
-      }
-
-      const data: Record<string, Player> = await response.json();
-
-      // Relevant positions for fantasy football
-      const relevantPositions = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
-
-      // Process players in batches to not block the main thread
-      const playerIds = Object.keys(data);
-
-      const tx = db.transaction('players', 'readwrite');
-
-      for (let i = 0; i < playerIds.length; i += BATCH_SIZE) {
-        const batch = playerIds.slice(i, i + BATCH_SIZE);
-        await Promise.all(
-          batch.map(id => {
-            const player = data[id];
-
-            if (player.status === 'Active' && relevantPositions.has(player.position)) {
-              player.player_id = id;
-              const height = player.height ? parseInt(player.height, 10) : undefined;
-              const isHeightValid = height && !isNaN(height) && height > 50 && height < 99;
-
-              if (!isHeightValid) {
-                player.height = undefined;
-              }
-              return tx.store.put(player);
-            }
-            return Promise.resolve();
-          })
-        );
-      }
-
-      await tx.done;
-
-      // Update metadata with version
-      await db.put('metadata', {
-        lastUpdated: Date.now(),
-        key: 'lastUpdate',
-        version: PLAYER_DATA_VERSION
-      });
-
+      const data = await fetchPlayers();
+      await storePlayers(db, data);
       return data;
     } catch (err) {
-      console.error('Error fetching players:', err);
+      console.error('Error in fetchAndStorePlayers:', err);
       throw err;
     }
   }, []);
