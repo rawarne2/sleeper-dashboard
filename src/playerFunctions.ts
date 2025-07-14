@@ -57,7 +57,7 @@ export const storePlayers = async (
 ): Promise<void> => {
     try {
         // Relevant positions for fantasy football
-        const relevantPositions = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF']);
+        const relevantPositions = new Set(['QB', 'RB', 'WR', 'TE', 'K']); // removed 'DEF' for my league
 
         // Process players in batches to not block the main thread
         const playerIds = Object.keys(playersData);
