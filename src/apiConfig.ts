@@ -1,7 +1,7 @@
 // API Configuration - Central location for all API URLs and endpoints
 export const API_CONFIG = {
-  BASE_URL: 'http://localhost:5000/api',
-
+  // BASE_URL: 'http://localhost:5000/api',
+  BASE_URL: 'https://sleeper-backend.vercel.app/api',
   // App constants
   LEAGUE_ID: '1210364682523656192', // 2025 season
   CURRENT_SEASON: 2025,
