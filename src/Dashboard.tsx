@@ -255,11 +255,14 @@ const DynastyDashboardV2: React.FC = () => {
       return { roster, user, players, starters, bench };
     }).sort((a, b) => {
       // Sort by wins (descending), then points (descending)
-      if (b.roster.settings.wins !== a.roster.settings.wins) {
-        return b.roster.settings.wins - a.roster.settings.wins;
+      const aWins = a.roster.settings.wins || 0;
+      const bWins = b.roster.settings.wins || 0;
+      if (bWins !== aWins) {
+        return bWins - aWins;
       }
-      return (b.roster.settings.fpts + (b.roster.settings.fpts_decimal || 0) / 100) -
-        (a.roster.settings.fpts + (a.roster.settings.fpts_decimal || 0) / 100);
+      const aPoints = (a.roster.settings.fpts || 0) + (a.roster.settings.fpts_decimal || 0) / 100;
+      const bPoints = (b.roster.settings.fpts || 0) + (b.roster.settings.fpts_decimal || 0) / 100;
+      return bPoints - aPoints;
     });
   }, [leagueData]);
 
@@ -281,17 +284,22 @@ const DynastyDashboardV2: React.FC = () => {
   );
 
   const getTeamRecord = (settings: RosterSettings) => {
-    return `${settings.wins}-${settings.losses}${settings.ties > 0 ? `-${settings.ties}` : ''}`;
+    const wins = settings.wins || 0;
+    const losses = settings.losses || 0;
+    const ties = settings.ties || 0;
+    return `${wins}-${losses}${ties > 0 ? `-${ties}` : ''}`;
   };
 
   const getPoints = (settings: RosterSettings) => {
-    return (settings.fpts + (settings.fpts_decimal || 0) / 100).toFixed(2);
+    const fpts = settings.fpts || 0;
+    const fpts_decimal = settings.fpts_decimal || 0;
+    return (fpts + fpts_decimal / 100).toFixed(2);
   };
 
   const getManagerEfficiency = (settings: RosterSettings) => {
-    const fpts = settings.fpts + (settings.fpts_decimal || 0);
-    const ppts = settings.ppts || 0 + (settings.ppts_decimal || 0);
-    return ppts > 0 ? ((fpts / ppts) * 100).toFixed(1) + '%' : '0.00%';
+    const fpts = (settings.fpts || 0) + (settings.fpts_decimal || 0) / 100;
+    const ppts = (settings.ppts || 0) + (settings.ppts_decimal || 0) / 100;
+    return ppts > 0 ? ((fpts / ppts) * 100).toFixed(1) + '%' : '0.0%';
   };
 
   const formatHeight = (height: string | undefined): string => {

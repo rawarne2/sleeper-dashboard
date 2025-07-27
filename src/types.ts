@@ -21,10 +21,10 @@ export interface Player {
 
 // Roster settings from the Sleeper API
 export interface RosterSettings {
-    wins: number;
-    losses: number;
-    ties: number;
-    fpts: number;
+    wins?: number;
+    losses?: number;
+    ties?: number;
+    fpts?: number;
     fpts_decimal?: number;
     fpts_against?: number;
     fpts_against_decimal?: number;
