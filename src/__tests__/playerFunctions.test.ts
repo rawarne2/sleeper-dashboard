@@ -14,7 +14,14 @@ const mockBackendPlayers = [
         Team: 'KC',
         Position: 'QB',
         Age: 28,
-        fantasy_positions: ['QB']
+        height: '6\'3"',
+        weight: '230',
+        years_exp: 7,
+        college: 'Texas Tech',
+        fantasy_positions: ['QB'],
+        injury_status: null,
+        jersey_number: 15,
+        depth_chart_order: 1
     },
     {
         sleeper_id: '456',
@@ -22,7 +29,14 @@ const mockBackendPlayers = [
         Team: 'KC',
         Position: 'TE',
         Age: 34,
-        fantasy_positions: ['TE']
+        height: '6\'5"',
+        weight: '260',
+        years_exp: 12,
+        college: 'Cincinnati',
+        fantasy_positions: ['TE'],
+        injury_status: null,
+        jersey_number: 87,
+        depth_chart_order: 1
     }
 ];
 
@@ -35,15 +49,15 @@ const mockPlayers: Record<string, Player> = {
         team: 'KC',
         position: 'QB',
         age: 28,
-        height: undefined,
-        weight: undefined,
-        years_exp: undefined,
-        college: undefined,
+        height: '6\'3"',
+        weight: '230',
+        years_exp: 7,
+        college: 'Texas Tech',
         fantasy_positions: ['QB'],
         status: 'Active',
         injury_status: null,
-        number: undefined,
-        depth_chart_position: undefined
+        number: 15,
+        depth_chart_position: 1
     },
     '456': {
         player_id: '456',
@@ -52,15 +66,15 @@ const mockPlayers: Record<string, Player> = {
         team: 'KC',
         position: 'TE',
         age: 34,
-        height: undefined,
-        weight: undefined,
-        years_exp: undefined,
-        college: undefined,
+        height: '6\'5"',
+        weight: '260',
+        years_exp: 12,
+        college: 'Cincinnati',
         fantasy_positions: ['TE'],
         status: 'Active',
         injury_status: null,
-        number: undefined,
-        depth_chart_position: undefined
+        number: 87,
+        depth_chart_position: 1
     }
 };
 
@@ -90,6 +104,118 @@ describe('Player Functions', () => {
             expect(result).toEqual(mockPlayers);
         });
 
+        it('should handle players with missing optional fields', async () => {
+            const backendPlayersWithMissingFields = [
+                {
+                    sleeper_id: '999',
+                    'Player Name': 'Rookie Player',
+                    Team: 'NYJ',
+                    Position: 'WR',
+                    Age: 22,
+                    fantasy_positions: ['WR']
+                    // Missing: height, weight, years_exp, college, etc.
+                }
+            ];
+
+            fetchSpy.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ players: backendPlayersWithMissingFields })
+            } as Response);
+
+            const result = await fetchPlayers();
+
+            expect(result['999']).toEqual({
+                player_id: '999',
+                first_name: 'Rookie',
+                last_name: 'Player',
+                team: 'NYJ',
+                position: 'WR',
+                age: 22,
+                height: undefined,
+                weight: undefined,
+                years_exp: undefined,
+                college: undefined,
+                fantasy_positions: ['WR'],
+                status: 'Active',
+                injury_status: null,
+                number: undefined,
+                depth_chart_position: undefined
+            });
+        });
+
+        it('should handle complex player names correctly', async () => {
+            const complexNamePlayers = [
+                {
+                    sleeper_id: '777',
+                    'Player Name': 'D\'Andre Swift Jr.',
+                    Team: 'CHI',
+                    Position: 'RB',
+                    Age: 25,
+                    fantasy_positions: ['RB']
+                },
+                {
+                    sleeper_id: '888',
+                    'Player Name': 'Saquon',
+                    Team: 'PHI',
+                    Position: 'RB',
+                    Age: 27,
+                    fantasy_positions: ['RB']
+                }
+            ];
+
+            fetchSpy.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ players: complexNamePlayers })
+            } as Response);
+
+            const result = await fetchPlayers();
+
+            // Test hyphenated last name
+            expect(result['777'].first_name).toBe('D\'Andre');
+            expect(result['777'].last_name).toBe('Swift Jr.');
+
+            // Test single name (no last name)
+            expect(result['888'].first_name).toBe('Saquon');
+            expect(result['888'].last_name).toBe('');
+        });
+
+        it('should handle invalid or missing player data gracefully', async () => {
+            const invalidPlayers = [
+                {
+                    sleeper_id: '123',
+                    'Player Name': 'Valid Player',
+                    Team: 'KC',
+                    Position: 'QB',
+                    Age: 28,
+                    fantasy_positions: ['QB']
+                },
+                {
+                    // Missing sleeper_id
+                    'Player Name': 'Invalid Player',
+                    Team: 'NYJ',
+                    Position: 'WR'
+                },
+                {
+                    sleeper_id: '456',
+                    // Missing Player Name
+                    Team: 'BUF',
+                    Position: 'RB'
+                }
+            ];
+
+            fetchSpy.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ players: invalidPlayers })
+            } as Response);
+
+            const result = await fetchPlayers();
+
+            // Should only include the valid player
+            expect(Object.keys(result)).toEqual(['123']);
+            expect(result['123'].first_name).toBe('Valid');
+            expect(result['123'].last_name).toBe('Player');
+        });
+
         it('should throw an error when fetch fails', async () => {
             // Mock failed API response
             fetchSpy.mockResolvedValueOnce({
@@ -99,6 +225,16 @@ describe('Player Functions', () => {
             } as Response);
 
             await expect(fetchPlayers()).rejects.toThrow('Failed to fetch players: 500 Internal Server Error');
+        });
+
+        it('should throw an error when response format is invalid', async () => {
+            // Mock response with wrong format
+            fetchSpy.mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ data: 'wrong format' })
+            } as Response);
+
+            await expect(fetchPlayers()).rejects.toThrow('Invalid player data format from backend');
         });
 
         it('should throw an error when network fails', async () => {

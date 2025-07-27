@@ -365,7 +365,7 @@ const DynastyDashboardV2: React.FC = () => {
                 Points: {getPoints(roster.settings)}
               </div>
               <div className="text-sm text-gray-400">
-                Efficiency: {getManagerEfficiency(roster.settings)}
+                Manager Efficiency: {getManagerEfficiency(roster.settings)}
               </div>
             </div>
             {expandedTeam === roster.roster_id ? (
