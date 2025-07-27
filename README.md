@@ -1,6 +1,23 @@
-## How to use
+# Sleeper Fantasy Football Dashboard
 
-1. Run `npm install`
-2. Run `npm run dev`
-3. Open `http://localhost:5173/`
-4. Test with `npm run test`
+Fantasy and dynasty football dashboard combining KeepTradeCut player valuations with Sleeper league data.
+
+**[Live Demo](https://sleeper-dashboard-xi.vercel.app/)**
+
+## Setup
+
+```bash
+npm install
+npm run dev
+npm test  # Run unit tests
+```
+
+## Configuration
+
+Update your league ID in `src/apiConfig.ts`:
+
+```typescript
+LEAGUE_ID: '1210364682523656192' // My Sleeper league ID
+```
+
+Built with React, TypeScript, and Tailwind CSS.

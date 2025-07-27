@@ -19,13 +19,10 @@ import {
   PlayerDBSchema
 } from './types';
 import { fetchPlayers, storePlayers } from './playerFunctions';
+import { API_CONFIG, API_URLS } from './apiConfig';
 
-// Constants
-const LEAGUE_ID = '1050831680350568448'; // <<<2024   vs  2025>>>'1210364682523656192';
-const PLAYER_CACHE_HOURS = 24;
-const BATCH_SIZE = 500;
-const PLAYER_DATA_VERSION = '1.0'; // Version for cache invalidation
-const CURRENT_SEASON = 2024;
+// Use centralized config
+const { LEAGUE_ID, PLAYER_CACHE_HOURS, BATCH_SIZE, PLAYER_DATA_VERSION } = API_CONFIG;
 
 const DynastyDashboardV2: React.FC = () => {
   const [leagueData, setLeagueData] = useState<LeagueData | null>(null);
@@ -66,12 +63,17 @@ const DynastyDashboardV2: React.FC = () => {
   // Fetch player ownership data
   const fetchPlayerOwnershipData = useCallback(async (db: IDBPDatabase<PlayerDBSchema>) => {
     try {
-      const response = await fetch(`https://api.sleeper.app/players/nfl/research/regular/${CURRENT_SEASON}/1?league_type=2`);
+      const response = await fetch(API_URLS.PLAYER_RESEARCH);
       if (!response.ok) {
         throw new Error(`Failed to fetch player ownership data: ${response.status} ${response.statusText}`);
       }
 
-      const data: PlayerOwnershipData = await response.json();
+      const apiResponse = await response.json();
+      if (!apiResponse?.data?.research_data) {
+        throw new Error('Invalid ownership data format from backend');
+      }
+
+      const data: PlayerOwnershipData = apiResponse.data.research_data;
 
       // Store the ownership data in IndexedDB
       const tx = db.transaction('ownership', 'readwrite');
@@ -168,12 +170,12 @@ const DynastyDashboardV2: React.FC = () => {
         let playersMap: Record<string, Player> = {};
         if (needsRefresh) {
           console.log('Refreshing player data...');
-          await fetchAndStorePlayers(db);
+          await fetchAndStorePlayers(db); // return players from this function so I don't have to call getPlayersFromDB
         }
 
         playersMap = await getPlayersFromDB(db);
         if (Object.keys(playersMap).length === 0) {
-          throw new Error('Failed to load player data');
+          throw new Error('Failed to load player data');  // remove after doing todo above
         }
 
         // Fetch player ownership data
@@ -188,20 +190,27 @@ const DynastyDashboardV2: React.FC = () => {
           console.error('Error loading player ownership data:', err);
         }
 
-        // Fetch rosters and users in parallel
-        const [rostersResponse, usersResponse] = await Promise.all([
-          fetch(`https://api.sleeper.app/v1/league/${LEAGUE_ID}/rosters`),
-          fetch(`https://api.sleeper.app/v1/league/${LEAGUE_ID}/users`)
-        ]);
-
-        if (!rostersResponse.ok || !usersResponse.ok) {
-          throw new Error('Failed to fetch league data');
+        // Fetch league data (rosters and users together)
+        let leagueResponse;
+        try {
+          leagueResponse = await fetch(API_URLS.SLEEPER_LEAGUE);
+        } catch {
+          throw new Error('Unable to connect to backend server. Please ensure it is running.');
         }
 
-        const [rostersData, usersData] = await Promise.all([
-          rostersResponse.json(),
-          usersResponse.json()
-        ]);
+        if (!leagueResponse.ok) {
+          throw new Error(`Failed to fetch league data: ${leagueResponse.status}`);
+        }
+
+        const leagueApiResponse = await leagueResponse.json();
+
+        // Validate response structure
+        if (!leagueApiResponse?.data?.rosters || !leagueApiResponse?.data?.users) {
+          throw new Error('Invalid league data format from backend');
+        }
+
+        const rostersData = leagueApiResponse.data.rosters;
+        const usersData = leagueApiResponse.data.users;
 
         setLeagueData({
           rosters: rostersData,
