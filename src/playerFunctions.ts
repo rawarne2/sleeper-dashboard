@@ -3,21 +3,49 @@ import { IDBPDatabase, IDBPTransaction } from 'idb';
 import { Player, PlayerDBSchema } from './types';
 import { API_URLS } from './apiConfig';
 
-// Type for backend KTC player response
+// Type for backend KTC player response (matching new backend structure)
 interface BackendPlayer {
-    sleeper_id: string;
-    'Player Name': string;
-    Team: string;
-    Position: string;
-    Age: number;
-    height?: string;
+    // Core identifiers
+    sleeper_player_id?: string;
+    playerName?: string;
+
+    // Team and position info
+    team?: string;
+    position?: string;
+
+    // Physical attributes (from Sleeper)
+    age?: number;
+    birth_date?: string;
+    height?: string; // Legacy field
+    heightFeet?: number;
+    heightInches?: number;
     weight?: string;
-    years_exp?: number;
     college?: string;
-    fantasy_positions?: string;
-    injury_status?: string;
-    jersey_number?: number;
-    depth_chart_order?: number;
+    years_exp?: number;
+    number?: number;
+    depth_chart_position?: number;
+
+    // Status information
+    status?: string;
+    injury_status?: string | null;
+
+    // KTC ranking data (structured)
+    ktc?: {
+        oneQBValues?: {
+            value?: number;
+            rank?: number;
+            positionalRank?: number;
+            overallTier?: number;
+            positionalTier?: number;
+        } | null;
+        superflexValues?: {
+            value?: number;
+            rank?: number;
+            positionalRank?: number;
+            overallTier?: number;
+            positionalTier?: number;
+        } | null;
+    };
 }
 
 // Constants
@@ -44,33 +72,33 @@ export const fetchPlayers = async (): Promise<Record<string, Player>> => {
         const playersRecord: Record<string, Player> = {};
         playersArray.forEach((player: BackendPlayer) => {
             try {
-                if (player.sleeper_id && player['Player Name']) {
-                    playersRecord[player.sleeper_id] = {
-                        player_id: player.sleeper_id,
-                        first_name: player['Player Name']?.split(' ')[0] || '',
-                        last_name: player['Player Name']?.split(' ').slice(1).join(' ') || '',
-                        team: player.Team || '',
-                        position: player.Position || '',
-                        age: player.Age || undefined,
+                if (player.sleeper_player_id && player.playerName) {
+                    playersRecord[player.sleeper_player_id] = {
+                        player_id: player.sleeper_player_id,
+                        sleeper_player_id: player.sleeper_player_id,
+                        playerName: player.playerName,
+                        first_name: player.playerName?.split(' ')[0] || '',
+                        last_name: player.playerName?.split(' ').slice(1).join(' ') || '',
+                        team: player.team || '',
+                        position: player.position || '',
+                        age: player.age,
+                        birth_date: player.birth_date,
                         height: player.height,
+                        heightFeet: player.heightFeet,
+                        heightInches: player.heightInches,
                         weight: player.weight,
                         years_exp: player.years_exp,
                         college: player.college,
-                        fantasy_positions: Array.isArray(player.fantasy_positions)
-                            ? player.fantasy_positions
-                            : player.fantasy_positions
-                                ? (typeof player.fantasy_positions === 'string'
-                                    ? JSON.parse(player.fantasy_positions)
-                                    : [])
-                                : [],
-                        status: 'Active', // Assume active since it's in rankings
+                        fantasy_positions: [player.position || ''], // Simple conversion for now
+                        status: player.status || 'Active',
                         injury_status: player.injury_status || null,
-                        number: player.jersey_number,
-                        depth_chart_position: player.depth_chart_order
+                        number: player.number,
+                        depth_chart_position: player.depth_chart_position,
+                        ktc: player.ktc
                     };
                 }
             } catch (e) {
-                console.error(`Error processing player with sleeper_id: ${player.sleeper_id}`, e);
+                console.error(`Error processing player with sleeper_player_id: ${player.sleeper_player_id}`, e);
             }
         });
 
@@ -104,7 +132,7 @@ export async function storePlayer(
     }
 
     // Store only active players with relevant positions
-    if (player.status === 'Active' && RELEVANT_POSITIONS.has(player.position)) {
+    if (player.status === 'Active' && player.position && RELEVANT_POSITIONS.has(player.position)) {
         return tx.store.put(player);
     }
 

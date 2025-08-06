@@ -1,10 +1,15 @@
 // API Configuration - Central location for all API URLs and endpoints
 export const API_CONFIG = {
-  // BASE_URL: 'http://localhost:5000/api',
-  BASE_URL: 'https://sleeper-backend.vercel.app/api',
+  BASE_URL: 'http://localhost:5000/api',
+  // BASE_URL: 'https://sleeper-backend.vercel.app/api',
+
+  // League configuration
+  LEAGUES: [
+    { id: '1210364682523656192', label: '2025 Season', season: 2025 },
+    { id: '1050831680350568448', label: '2024 Season', season: 2024 }
+  ],
+
   // App constants
-  LEAGUE_ID: '1210364682523656192', // 2025 season
-  CURRENT_SEASON: 2025,
   PLAYER_CACHE_HOURS: 24,
   BATCH_SIZE: 500,
   PLAYER_DATA_VERSION: '1.0',
@@ -15,6 +20,7 @@ export const API_CONFIG = {
     KTC_HEALTH: '/ktc/health',
     KTC_RANKINGS: '/ktc/rankings',
     KTC_REFRESH: '/ktc/refresh',
+    KTC_REFRESH_ALL: '/ktc/refresh/all',
     KTC_CLEANUP: '/ktc/cleanup',
 
     // Sleeper endpoints  
@@ -23,9 +29,8 @@ export const API_CONFIG = {
     SLEEPER_LEAGUE_ROSTERS: (leagueId: string) => `/sleeper/league/${leagueId}/rosters`,
     SLEEPER_LEAGUE_USERS: (leagueId: string) => `/sleeper/league/${leagueId}/users`,
     SLEEPER_LEAGUE_REFRESH: (leagueId: string) => `/sleeper/league/${leagueId}/refresh`,
-    PLAYER_RESEARCH: (season: number) => `/sleeper/players/research/${season}`,
-    PLAYER_RESEARCH_REFRESH: (season: number) => `/sleeper/players/research/${season}/refresh`,
-    SLEEPER_REFRESH_ALL: '/sleeper/refresh/all'
+    SLEEPER_RESEARCH: (season: number) => `/sleeper/players/research/${season}`,
+    SLEEPER_RESEARCH_REFRESH: (season: number) => `/sleeper/players/research/${season}/refresh`
   }
 };
 
@@ -41,7 +46,10 @@ export const buildApiUrl = (endpoint: string, params?: Record<string, string>) =
   return url;
 };
 
-// Pre-built URLs for common use cases
+// Pre-built URLs for common use cases (using default 2025 league)
+const DEFAULT_LEAGUE_ID = API_CONFIG.LEAGUES[0].id;
+const DEFAULT_SEASON = API_CONFIG.LEAGUES[0].season;
+
 export const API_URLS = {
   // KTC URLs
   KTC_HEALTH: buildApiUrl(API_CONFIG.ENDPOINTS.KTC_HEALTH),
@@ -55,8 +63,8 @@ export const API_URLS = {
     is_redraft: 'false'
   }),
 
-  // Sleeper URLs
-  SLEEPER_LEAGUE: buildApiUrl(API_CONFIG.ENDPOINTS.SLEEPER_LEAGUE(API_CONFIG.LEAGUE_ID)),
-  PLAYER_RESEARCH: buildApiUrl(API_CONFIG.ENDPOINTS.PLAYER_RESEARCH(API_CONFIG.CURRENT_SEASON)),
+  // Sleeper URLs (using default league/season)
+  SLEEPER_LEAGUE: buildApiUrl(API_CONFIG.ENDPOINTS.SLEEPER_LEAGUE(DEFAULT_LEAGUE_ID)),
+  SLEEPER_RESEARCH: buildApiUrl(API_CONFIG.ENDPOINTS.SLEEPER_RESEARCH(DEFAULT_SEASON)),
   SLEEPER_REFRESH: buildApiUrl(API_CONFIG.ENDPOINTS.SLEEPER_REFRESH)
 };
