@@ -17,8 +17,6 @@ interface BackendPlayer {
     age?: number;
     birth_date?: string;
     height?: string; // Legacy field
-    heightFeet?: number;
-    heightInches?: number;
     weight?: string;
     college?: string;
     years_exp?: number;
@@ -45,6 +43,9 @@ interface BackendPlayer {
             overallTier?: number;
             positionalTier?: number;
         } | null;
+        heightFeet?: number;
+        heightInches?: number;
+        age?: number;
     };
 }
 
@@ -81,11 +82,11 @@ export const fetchPlayers = async (): Promise<Record<string, Player>> => {
                         last_name: player.playerName?.split(' ').slice(1).join(' ') || '',
                         team: player.team || '',
                         position: player.position || '',
-                        age: player.age,
+                        age: player.ktc?.age,
                         birth_date: player.birth_date,
                         height: player.height,
-                        heightFeet: player.heightFeet,
-                        heightInches: player.heightInches,
+                        heightFeet: player.ktc?.heightFeet,
+                        heightInches: player.ktc?.heightInches,
                         weight: player.weight,
                         years_exp: player.years_exp,
                         college: player.college,
