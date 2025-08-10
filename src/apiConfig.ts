@@ -1,7 +1,6 @@
 // API Configuration - Central location for all API URLs and endpoints
 export const API_CONFIG = {
-  BASE_URL: 'http://localhost:5000/api',
-  // BASE_URL: 'https://sleeper-backend.vercel.app/api',
+  BASE_URL: import.meta.env.DEV ? 'http://localhost:5000/api' : import.meta.env.VITE_API_URL,
 
   // League configuration
   LEAGUES: [
@@ -49,7 +48,7 @@ export const buildApiUrl = (endpoint: string, params?: Record<string, string>) =
 // Pre-built URLs for common use cases (using default 2025 league)
 const DEFAULT_LEAGUE_ID = API_CONFIG.LEAGUES[0].id;
 const DEFAULT_SEASON = API_CONFIG.LEAGUES[0].season;
-
+console.log('env>', import.meta.env)
 export const API_URLS = {
   // KTC URLs
   KTC_HEALTH: buildApiUrl(API_CONFIG.ENDPOINTS.KTC_HEALTH),
