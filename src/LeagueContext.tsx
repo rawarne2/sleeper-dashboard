@@ -1,6 +1,4 @@
 import React, {
-  createContext,
-  useContext,
   useState,
   useEffect,
   useMemo,
@@ -19,19 +17,10 @@ import {
 } from './types';
 import { fetchPlayers, storePlayers } from './playerFunctions';
 import { API_CONFIG, buildApiUrl } from './apiConfig';
+import { LeagueContext } from './leagueContextValue';
 
 const { LEAGUES, PLAYER_CACHE_HOURS, BATCH_SIZE, PLAYER_DATA_VERSION } =
   API_CONFIG;
-
-const LeagueContext = createContext<LeagueContextType | null>(null);
-
-export const useLeague = (): LeagueContextType => {
-  const context = useContext(LeagueContext);
-  if (!context) {
-    throw new Error('useLeague must be used within a LeagueProvider');
-  }
-  return context;
-};
 
 interface LeagueProviderProps {
   children: ReactNode;
@@ -276,7 +265,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       setPlayerOwnership(ownershipMap);
     } catch (err) {
       console.error('Error loading data:', err);
-      setError('Failed to load league data. Please try again later.');
+      setError(`Failed to load league data. Please try again later. ${err}`);
     } finally {
       setLoading(false);
     }

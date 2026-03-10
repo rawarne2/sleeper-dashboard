@@ -14,10 +14,6 @@ npm test  # Run unit tests
 
 ## Configuration
 
-Update your league ID in `src/apiConfig.ts`:
-
-```typescript
-LEAGUE_ID: '1210364682523656192' // My Sleeper league ID
-```
+Update your LEAGUE_ID in `src/apiConfig.ts`:
 
 Built with React, TypeScript, and Tailwind CSS.

@@ -1,9 +1,10 @@
 // API Configuration - Central location for all API URLs and endpoints
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.DEV ? 'http://localhost:5000/api' : import.meta.env.VITE_API_URL,
+  BASE_URL: import.meta.env.DEV ? 'http://localhost:5001/api' : import.meta.env.VITE_API_URL,
 
   // League configuration
   LEAGUES: [
+    { id: '1333945997071515648', label: '2026 Season', season: 2026 },
     { id: '1210364682523656192', label: '2025 Season', season: 2025 },
     { id: '1050831680350568448', label: '2024 Season', season: 2024 }
   ],
