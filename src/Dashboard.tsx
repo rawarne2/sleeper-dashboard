@@ -19,8 +19,10 @@ const DynastyDashboardV2: React.FC = () => {
   // Use league context instead of local state
   const {
     teamsData,
+    teamsDataPreview,
     playerOwnership,
     loading,
+    playersLoading,
     error,
     selectedLeagueId,
     setSelectedLeagueId,
@@ -227,7 +229,15 @@ const DynastyDashboardV2: React.FC = () => {
   );
 
   const TeamPanel = memo(
-    ({ teamData, index }: { teamData: TeamData; index: number }) => {
+    ({
+      teamData,
+      index,
+      rosterDetailsPending = false,
+    }: {
+      teamData: TeamData;
+      index: number;
+      rosterDetailsPending?: boolean;
+    }) => {
       const { roster, user, starters, bench } = teamData;
 
       return (
@@ -293,8 +303,19 @@ const DynastyDashboardV2: React.FC = () => {
             <>
               <div className='border-t border-border-subtle'></div>
               <div className='p-2 sm:p-4'>
-                <PlayerTable title='Starters' players={starters} />
-                <PlayerTable title='Bench' players={bench} />
+                {rosterDetailsPending ? (
+                  <div className='flex flex-col items-center justify-center py-8 text-gray-400 gap-2'>
+                    <div className='animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-main' />
+                    <p className='text-sm text-center max-w-sm'>
+                      Loading KTC rankings to show starters and bench...
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <PlayerTable title='Starters' players={starters} />
+                    <PlayerTable title='Bench' players={bench} />
+                  </>
+                )}
               </div>
             </>
           )}
@@ -348,9 +369,34 @@ const DynastyDashboardV2: React.FC = () => {
 
       <div className='flex-1'>
         {loading ? (
-          <div className='flex justify-center items-center h-[50vh]'>
-            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-main'></div>
-            <div className='text-xl ml-2'>Loading league data...</div>
+          <div className='flex flex-col justify-center items-center h-[50vh] gap-3'>
+            <div className='flex items-center'>
+              <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-main' />
+              <div className='text-xl ml-3'>Loading league data...</div>
+            </div>
+          </div>
+        ) : playersLoading ? (
+          <div className='grid grid-cols-1 gap-4'>
+            <div className='bg-background-paper justify-center rounded-lg'>
+              <div className='text-2xl font-semibold text-primary-main text-center my-6'>
+                League Standings
+              </div>
+              <div className='flex items-center justify-center gap-2 px-4 pb-4 text-sm text-gray-400'>
+                <div className='animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-main shrink-0' />
+                <span>
+                  Loading KTC player data in background — the initial load takes a long time, but you can expand a team after
+                  it finishes to see rosters.
+                </span>
+              </div>
+              {teamsDataPreview.map((team, index) => (
+                <TeamPanel
+                  key={team.roster.roster_id}
+                  teamData={team}
+                  index={index}
+                  rosterDetailsPending
+                />
+              ))}
+            </div>
           </div>
         ) : (
           <div className='grid grid-cols-1 gap-4'>

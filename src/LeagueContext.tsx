@@ -37,6 +37,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   // UI state
   const [loading, setLoading] = useState(true);
+  const [playersLoading, setPlayersLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLeagueId, setSelectedLeagueId] = useState<string>(
     LEAGUES[0].id
@@ -197,39 +198,15 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     []
   );
 
-  // Refresh data function
+  // Refresh data function — league first (fast), then players/KTC (slow on cold cache)
   const refreshData = useCallback(async () => {
     setLoading(true);
+    setPlayersLoading(false);
     setError(null);
     try {
-      // Initialize players from IndexedDB
       const db = await initDB();
-      const needsRefresh = await shouldRefreshPlayers(db);
 
-      let playersMap: Record<string, Player> = {};
-      if (needsRefresh) {
-        console.log('Refreshing player data...');
-        await fetchAndStorePlayers(db);
-      }
-
-      playersMap = await getPlayersFromDB(db);
-      if (Object.keys(playersMap).length === 0) {
-        throw new Error('Failed to load player data');
-      }
-
-      // Fetch player ownership data with current season
-      let ownershipMap: PlayerOwnershipData = {};
-      try {
-        ownershipMap = await getPlayerOwnershipFromDB(db, currentSeason);
-        if (Object.keys(ownershipMap).length === 0) {
-          console.log('Fetching player ownership data...');
-          ownershipMap = await fetchPlayerOwnershipData(db, currentSeason);
-        }
-      } catch (err) {
-        console.error('Error loading player ownership data:', err);
-      }
-
-      // Fetch league data with dynamic league ID
+      // 1) Fetch Sleeper league first so UI can show shell without waiting on KTC
       const leagueUrl = buildApiUrl(
         API_CONFIG.ENDPOINTS.SLEEPER_LEAGUE(selectedLeagueId)
       );
@@ -249,8 +226,6 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
 
       const leagueApiResponse = await leagueResponse.json();
-
-      // Validate response structure
       if (
         !leagueApiResponse?.data?.rosters ||
         !leagueApiResponse?.data?.users
@@ -258,9 +233,46 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         throw new Error('Invalid league data format from backend');
       }
 
-      // Update states
       setRosters(leagueApiResponse.data.rosters);
       setUsers(leagueApiResponse.data.users);
+      setLoading(false);
+
+      // 2) Players + ownership (KTC fetch can take ~1min on first load)
+      const needsRefresh = await shouldRefreshPlayers(db);
+      if (needsRefresh) {
+        setPlayersLoading(true);
+        console.log('Refreshing player data...');
+        try {
+          await fetchAndStorePlayers(db);
+        } catch (playerErr) {
+          console.error('Error loading player data:', playerErr);
+          setError(
+            `League loaded but player rankings failed to load. ${playerErr}`
+          );
+          setPlayersLoading(false);
+          return;
+        }
+      }
+
+      let playersMap: Record<string, Player> = {};
+      playersMap = await getPlayersFromDB(db);
+      if (Object.keys(playersMap).length === 0) {
+        setError('Failed to load player data');
+        setPlayersLoading(false);
+        return;
+      }
+
+      let ownershipMap: PlayerOwnershipData = {};
+      try {
+        ownershipMap = await getPlayerOwnershipFromDB(db, currentSeason);
+        if (Object.keys(ownershipMap).length === 0) {
+          console.log('Fetching player ownership data...');
+          ownershipMap = await fetchPlayerOwnershipData(db, currentSeason);
+        }
+      } catch (err) {
+        console.error('Error loading player ownership data:', err);
+      }
+
       setPlayers(playersMap);
       setPlayerOwnership(ownershipMap);
     } catch (err) {
@@ -268,6 +280,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       setError(`Failed to load league data. Please try again later. ${err}`);
     } finally {
       setLoading(false);
+      setPlayersLoading(false);
     }
   }, [
     selectedLeagueId,
@@ -279,6 +292,39 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     fetchPlayerOwnershipData,
     getPlayerOwnershipFromDB,
   ]);
+
+  // Standings preview: same order as teamsData but without player resolution (rosters + users only)
+  const teamsDataPreview = useMemo((): TeamData[] => {
+    if (rosters.length === 0 || users.length === 0) return [];
+
+    return rosters
+      .map((roster) => {
+        const user = users.find((u) => u.user_id === roster.owner_id) || {
+          user_id: roster.owner_id,
+          username: 'Unknown User',
+          display_name: 'Unknown',
+        };
+        return {
+          roster,
+          user,
+          players: [],
+          starters: [],
+          bench: [],
+        };
+      })
+      .sort((a, b) => {
+        const aWins = a.roster.settings.wins || 0;
+        const bWins = b.roster.settings.wins || 0;
+        if (bWins !== aWins) return bWins - aWins;
+        const aPoints =
+          (a.roster.settings.fpts || 0) +
+          (a.roster.settings.fpts_decimal || 0) / 100;
+        const bPoints =
+          (b.roster.settings.fpts || 0) +
+          (b.roster.settings.fpts_decimal || 0) / 100;
+        return bPoints - aPoints;
+      });
+  }, [rosters, users]);
 
   // Computed teamsData
   const teamsData = useMemo((): TeamData[] => {
@@ -344,9 +390,11 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
     // Computed state
     teamsData,
+    teamsDataPreview,
 
     // UI state
     loading,
+    playersLoading,
     error,
     selectedLeagueId,
     setSelectedLeagueId,

@@ -270,9 +270,13 @@ export interface LeagueContextType {
 
     // Computed state
     teamsData: TeamData[];
+    /** Standings from rosters + users only; starters/bench empty until KTC players load */
+    teamsDataPreview: TeamData[];
 
     // UI state
     loading: boolean;
+    /** True while KTC/player rankings are loading (can be slow on first load). League may already be shown. */
+    playersLoading: boolean;
     error: string | null;
     selectedLeagueId: string;
     setSelectedLeagueId: (id: string) => void;

@@ -6,44 +6,46 @@ import { fetchPlayers, storePlayers, storePlayer, fetchAndStorePlayers } from '.
 import { PlayerDBSchema, Player } from '../types';
 import 'fake-indexeddb/auto';
 
-// Mock data
+// Backend shape expected by fetchPlayers (BackendPlayer: sleeper_player_id + playerName required)
 const mockBackendPlayers = [
     {
-        sleeper_id: '123',
-        'Player Name': 'Patrick Mahomes',
-        Team: 'KC',
-        Position: 'QB',
-        Age: 28,
+        sleeper_player_id: '123',
+        playerName: 'Patrick Mahomes',
+        team: 'KC',
+        position: 'QB',
+        ktc: { age: 28 },
         height: '6\'3"',
         weight: '230',
         years_exp: 7,
         college: 'Texas Tech',
-        fantasy_positions: ['QB'],
         injury_status: null,
-        jersey_number: 15,
-        depth_chart_order: 1
+        number: 15,
+        depth_chart_position: 1,
+        status: 'Active'
     },
     {
-        sleeper_id: '456',
-        'Player Name': 'Travis Kelce',
-        Team: 'KC',
-        Position: 'TE',
-        Age: 34,
+        sleeper_player_id: '456',
+        playerName: 'Travis Kelce',
+        team: 'KC',
+        position: 'TE',
+        ktc: { age: 34 },
         height: '6\'5"',
         weight: '260',
         years_exp: 12,
         college: 'Cincinnati',
-        fantasy_positions: ['TE'],
         injury_status: null,
-        jersey_number: 87,
-        depth_chart_order: 1
+        number: 87,
+        depth_chart_position: 1,
+        status: 'Active'
     }
 ];
 
-// Expected result after transformation
+// Exact output of fetchPlayers for mockBackendPlayers (matches playerFunctions mapping)
 const mockPlayers: Record<string, Player> = {
     '123': {
         player_id: '123',
+        sleeper_player_id: '123',
+        playerName: 'Patrick Mahomes',
         first_name: 'Patrick',
         last_name: 'Mahomes',
         team: 'KC',
@@ -57,10 +59,13 @@ const mockPlayers: Record<string, Player> = {
         status: 'Active',
         injury_status: null,
         number: 15,
-        depth_chart_position: 1
+        depth_chart_position: 1,
+        ktc: { age: 28 }
     },
     '456': {
         player_id: '456',
+        sleeper_player_id: '456',
+        playerName: 'Travis Kelce',
         first_name: 'Travis',
         last_name: 'Kelce',
         team: 'KC',
@@ -74,7 +79,8 @@ const mockPlayers: Record<string, Player> = {
         status: 'Active',
         injury_status: null,
         number: 87,
-        depth_chart_position: 1
+        depth_chart_position: 1,
+        ktc: { age: 34 }
     }
 };
 
@@ -107,13 +113,13 @@ describe('Player Functions', () => {
         it('should handle players with missing optional fields', async () => {
             const backendPlayersWithMissingFields = [
                 {
-                    sleeper_id: '999',
-                    'Player Name': 'Rookie Player',
-                    Team: 'NYJ',
-                    Position: 'WR',
-                    Age: 22,
-                    fantasy_positions: ['WR']
-                    // Missing: height, weight, years_exp, college, etc.
+                    sleeper_player_id: '999',
+                    playerName: 'Rookie Player',
+                    team: 'NYJ',
+                    position: 'WR',
+                    ktc: { age: 22 },
+                    status: 'Active'
+                    // Missing: height, weight, years_exp, college, number, etc.
                 }
             ];
 
@@ -126,6 +132,8 @@ describe('Player Functions', () => {
 
             expect(result['999']).toEqual({
                 player_id: '999',
+                sleeper_player_id: '999',
+                playerName: 'Rookie Player',
                 first_name: 'Rookie',
                 last_name: 'Player',
                 team: 'NYJ',
@@ -139,27 +147,28 @@ describe('Player Functions', () => {
                 status: 'Active',
                 injury_status: null,
                 number: undefined,
-                depth_chart_position: undefined
+                depth_chart_position: undefined,
+                ktc: { age: 22 }
             });
         });
 
         it('should handle complex player names correctly', async () => {
             const complexNamePlayers = [
                 {
-                    sleeper_id: '777',
-                    'Player Name': 'D\'Andre Swift Jr.',
-                    Team: 'CHI',
-                    Position: 'RB',
-                    Age: 25,
-                    fantasy_positions: ['RB']
+                    sleeper_player_id: '777',
+                    playerName: 'D\'Andre Swift Jr.',
+                    team: 'CHI',
+                    position: 'RB',
+                    ktc: { age: 25 },
+                    status: 'Active'
                 },
                 {
-                    sleeper_id: '888',
-                    'Player Name': 'Saquon',
-                    Team: 'PHI',
-                    Position: 'RB',
-                    Age: 27,
-                    fantasy_positions: ['RB']
+                    sleeper_player_id: '888',
+                    playerName: 'Saquon',
+                    team: 'PHI',
+                    position: 'RB',
+                    ktc: { age: 27 },
+                    status: 'Active'
                 }
             ];
 
@@ -182,24 +191,26 @@ describe('Player Functions', () => {
         it('should handle invalid or missing player data gracefully', async () => {
             const invalidPlayers = [
                 {
-                    sleeper_id: '123',
-                    'Player Name': 'Valid Player',
-                    Team: 'KC',
-                    Position: 'QB',
-                    Age: 28,
-                    fantasy_positions: ['QB']
+                    sleeper_player_id: '123',
+                    playerName: 'Valid Player',
+                    team: 'KC',
+                    position: 'QB',
+                    ktc: { age: 28 },
+                    status: 'Active'
                 },
                 {
-                    // Missing sleeper_id
-                    'Player Name': 'Invalid Player',
-                    Team: 'NYJ',
-                    Position: 'WR'
+                    // Missing sleeper_player_id
+                    playerName: 'Invalid Player',
+                    team: 'NYJ',
+                    position: 'WR',
+                    status: 'Active'
                 },
                 {
-                    sleeper_id: '456',
-                    // Missing Player Name
-                    Team: 'BUF',
-                    Position: 'RB'
+                    sleeper_player_id: '456',
+                    // Missing playerName
+                    team: 'BUF',
+                    position: 'RB',
+                    status: 'Active'
                 }
             ];
 
@@ -210,10 +221,11 @@ describe('Player Functions', () => {
 
             const result = await fetchPlayers();
 
-            // Should only include the valid player
+            // Should only include the valid player (sleeper_player_id + playerName both required)
             expect(Object.keys(result)).toEqual(['123']);
             expect(result['123'].first_name).toBe('Valid');
             expect(result['123'].last_name).toBe('Player');
+            expect(result['123'].playerName).toBe('Valid Player');
         });
 
         it('should throw an error when fetch fails', async () => {
