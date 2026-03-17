@@ -3,11 +3,10 @@ import Dashboard from './Dashboard'
 import { Analytics } from '@vercel/analytics/react'
 
 function App() {
-
   return (
     <>
       <Dashboard />
-      <Analytics />
+      {import.meta.env.PROD && <Analytics />}
     </>
   )
 }

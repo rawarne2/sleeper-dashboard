@@ -10,7 +10,10 @@ import {
   Roster,
   User,
   Player,
+  League,
   PlayerOwnershipData,
+  PlayerOwnershipStats,
+  ResearchMeta,
   TeamData,
   LeagueContextType,
   PlayerDBSchema,
@@ -31,9 +34,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const [rosters, setRosters] = useState<Roster[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [players, setPlayers] = useState<Record<string, Player>>({});
-  const [playerOwnership, setPlayerOwnership] = useState<PlayerOwnershipData>(
-    {}
-  );
+  const [playerOwnership, setPlayerOwnership] = useState<PlayerOwnershipData>({});
+  const [league, setLeague] = useState<League | null>(null);
+  const [researchMeta, setResearchMeta] = useState<ResearchMeta | null>(null);
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -81,9 +84,17 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     []
   );
 
-  // Fetch player ownership data with dynamic season
+  // Fetch player ownership data with dynamic season.
+  // Returns both the ownership map and any research metadata from the response.
+  // Handles multiple backend response shapes:
+  //   A) data is an array of ResearchData objects (one per player)
+  //   B) data is a single object with nested research_data map
+  //   C) data itself is a flat {playerId: {owned, started}} map
   const fetchPlayerOwnershipData = useCallback(
-    async (db: IDBPDatabase<PlayerDBSchema>, season: number) => {
+    async (db: IDBPDatabase<PlayerDBSchema>, season: number): Promise<{
+      ownership: PlayerOwnershipData;
+      meta: ResearchMeta | null;
+    }> => {
       try {
         const playerResearchUrl = buildApiUrl(
           API_CONFIG.ENDPOINTS.SLEEPER_RESEARCH(season)
@@ -100,33 +111,86 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           throw new Error('Invalid ownership data format from backend');
         }
 
-        // Handle the new backend response structure
-        const data: PlayerOwnershipData = apiResponse.data.research_data || {};
+        const rawData = apiResponse.data;
+        let ownership: PlayerOwnershipData = {};
+        let meta: ResearchMeta | null = null;
 
-        // Store the ownership data in IndexedDB with season-specific key
-        const tx = db.transaction('ownership', 'readwrite');
+        if (Array.isArray(rawData)) {
+          // Shape A: array of per-player ResearchData objects
+          // Use the first item for metadata
+          const first = rawData[0];
+          if (first) {
+            meta = {
+              season: String(first.season || season),
+              week: first.week || 0,
+              league_type: first.league_type || 0,
+              last_updated: first.last_updated || new Date().toISOString(),
+            };
+          }
+          for (const item of rawData) {
+            if (item.player_id) {
+              const rd = item.research_data as Record<string, unknown> | undefined;
+              if (rd && typeof rd.owned === 'number') {
+                ownership[item.player_id] = {
+                  owned: rd.owned as number,
+                  started: (rd.started as number) || 0,
+                };
+              }
+            }
+          }
+        } else {
+          // Shape B or C: single object
+          meta = {
+            season: String(rawData.season || season),
+            week: rawData.week || 0,
+            league_type: rawData.league_type || 0,
+            last_updated: rawData.last_updated || new Date().toISOString(),
+          };
 
-        const playerIds = Object.keys(data);
-        for (let i = 0; i < playerIds.length; i += BATCH_SIZE) {
-          const batch = playerIds.slice(i, i + BATCH_SIZE);
-          await Promise.all(
-            batch.map((id) => {
-              const ownershipData = data[id];
-              return tx.store.put({
-                key: `${season}_${id}`,
-                player_id: id,
-                owned: ownershipData.owned,
-                started: ownershipData.started,
-              });
-            })
-          );
+          const nested = rawData.research_data;
+          if (nested && typeof nested === 'object' && !Array.isArray(nested) && Object.keys(nested).length > 0) {
+            // Shape B: nested research_data map
+            ownership = nested as PlayerOwnershipData;
+          } else {
+            // Shape C: the data object itself might be the flat ownership map
+            for (const [key, val] of Object.entries(rawData)) {
+              if (
+                typeof val === 'object' &&
+                val !== null &&
+                'owned' in (val as object) &&
+                typeof (val as PlayerOwnershipStats).owned === 'number'
+              ) {
+                ownership[key] = val as PlayerOwnershipStats;
+              }
+            }
+          }
         }
 
-        await tx.done;
-        return data;
+        // Persist to IndexedDB
+        if (Object.keys(ownership).length > 0) {
+          const tx = db.transaction('ownership', 'readwrite');
+          const playerIds = Object.keys(ownership);
+          for (let i = 0; i < playerIds.length; i += BATCH_SIZE) {
+            const batch = playerIds.slice(i, i + BATCH_SIZE);
+            await Promise.all(
+              batch.map((id) => {
+                const ownershipData = ownership[id];
+                return tx.store.put({
+                  key: `${season}_${id}`,
+                  player_id: id,
+                  owned: ownershipData.owned,
+                  started: ownershipData.started,
+                });
+              })
+            );
+          }
+          await tx.done;
+        }
+
+        return { ownership, meta };
       } catch (err) {
         console.error('Error fetching player ownership data:', err);
-        return {};
+        return { ownership: {}, meta: null };
       }
     },
     []
@@ -235,6 +299,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
       setRosters(leagueApiResponse.data.rosters);
       setUsers(leagueApiResponse.data.users);
+      if (leagueApiResponse.data.league) {
+        setLeague(leagueApiResponse.data.league);
+      }
       setLoading(false);
 
       // 2) Players + ownership (KTC fetch can take ~1min on first load)
@@ -262,15 +329,19 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         return;
       }
 
+      // Always fetch fresh ownership so stale IndexedDB cache doesn't block updates
       let ownershipMap: PlayerOwnershipData = {};
       try {
-        ownershipMap = await getPlayerOwnershipFromDB(db, currentSeason);
+        const { ownership, meta } = await fetchPlayerOwnershipData(db, currentSeason);
+        ownershipMap = ownership;
+        if (meta) setResearchMeta(meta);
+        // Fallback to IndexedDB if API returned empty
         if (Object.keys(ownershipMap).length === 0) {
-          console.log('Fetching player ownership data...');
-          ownershipMap = await fetchPlayerOwnershipData(db, currentSeason);
+          ownershipMap = await getPlayerOwnershipFromDB(db, currentSeason);
         }
       } catch (err) {
         console.error('Error loading player ownership data:', err);
+        ownershipMap = await getPlayerOwnershipFromDB(db, currentSeason);
       }
 
       setPlayers(playersMap);
@@ -310,6 +381,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           players: [],
           starters: [],
           bench: [],
+          reserve: [],
         };
       })
       .sort((a, b) => {
@@ -353,11 +425,19 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           .filter((p) => !!p);
 
         const starterIds = new Set(roster.starters);
+        const reserveIds = new Set(roster.reserve || []);
+
+        // Bench = not a starter AND not on IR/reserve
         const bench = playersList.filter(
-          (p) => p.player_id && !starterIds.has(p.player_id)
+          (p) => p.player_id && !starterIds.has(p.player_id) && !reserveIds.has(p.player_id)
         );
 
-        return { roster, user, players: playersList, starters, bench };
+        // Reserve / IR players
+        const reserve = playersList.filter(
+          (p) => p.player_id && reserveIds.has(p.player_id)
+        );
+
+        return { roster, user, players: playersList, starters, bench, reserve };
       })
       .sort((a, b) => {
         // Sort by wins (descending), then points (descending)
@@ -376,6 +456,15 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       });
   }, [rosters, users, players]);
 
+  // Derive champion from rank===1 roster when league is complete
+  const championUserId = useMemo((): string | null => {
+    if (!league || league.status !== 'complete') return null;
+    const championRoster = rosters.find((r) => r.settings.rank === 1);
+    if (!championRoster) return null;
+    const championUser = users.find((u) => u.user_id === championRoster.owner_id);
+    return championUser?.user_id ?? null;
+  }, [league, rosters, users]);
+
   // Load data on mount and league change
   useEffect(() => {
     refreshData();
@@ -387,6 +476,11 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     users,
     players,
     playerOwnership,
+
+    // League metadata
+    league,
+    researchMeta,
+    championUserId,
 
     // Computed state
     teamsData,

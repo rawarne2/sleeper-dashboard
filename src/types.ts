@@ -107,6 +107,7 @@ export interface RosterSettings {
     waiver_position?: number;
     waiver_budget_used?: number;
     total_moves?: number;
+    rank?: number;
 }
 
 export interface Roster {
@@ -157,6 +158,13 @@ export interface ResearchData {
     league_type: number;
     player_id: string;
     research_data: Record<string, unknown>; // Generic research metrics
+    last_updated: string;
+}
+
+export interface ResearchMeta {
+    season: string;
+    week: number;
+    league_type: number;
     last_updated: string;
 }
 
@@ -224,6 +232,7 @@ export interface TeamData {
     players: Player[];
     starters: Player[];
     bench: Player[];
+    reserve: Player[];
 }
 
 // ============================================================================
@@ -268,14 +277,17 @@ export interface LeagueContextType {
     players: Record<string, Player>;
     playerOwnership: PlayerOwnershipData;
 
+    // League metadata from backend
+    league: League | null;
+    researchMeta: ResearchMeta | null;
+    championUserId: string | null;
+
     // Computed state
     teamsData: TeamData[];
-    /** Standings from rosters + users only; starters/bench empty until KTC players load */
     teamsDataPreview: TeamData[];
 
     // UI state
     loading: boolean;
-    /** True while KTC/player rankings are loading (can be slow on first load). League may already be shown. */
     playersLoading: boolean;
     error: string | null;
     selectedLeagueId: string;
