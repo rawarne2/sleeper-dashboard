@@ -381,7 +381,7 @@ const DynastyDashboardV2: React.FC = () => {
       bench: Player[];
       reserve: Player[];
     }) => (
-      <div className='rounded-md overflow-hidden border border-white/[0.07]'>
+      <div className='rounded-md overflow-x-scroll border border-white/[0.07]'>
         <table className='w-full border-collapse'>
           <thead className='sticky top-0 z-10 bg-[#0d1e2e]'>
             <tr className='border-b border-white/8'>
