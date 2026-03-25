@@ -1,4 +1,3 @@
-// Pure stat calculation and formatting helpers — no React, no JSX.
 import { Player, RosterSettings } from '../types';
 
 export function getLeagueStatusInfo(status: string): { label: string; className: string } {

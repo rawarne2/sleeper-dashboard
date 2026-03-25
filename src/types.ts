@@ -1,7 +1,5 @@
-// Types for Sleeper Dashboard
-
 // ============================================================================
-// API Response Types (matching backend structure)
+// API Response Types
 // ============================================================================
 export interface ApiResponse<T = unknown> {
     status?: 'success' | 'error' | 'healthy' | 'unhealthy';
@@ -15,7 +13,7 @@ export interface ApiResponse<T = unknown> {
 }
 
 // ============================================================================
-// KTC Value Types (matching backend KTC data structure)
+// KTC Value Types
 // ============================================================================
 export interface KTCValues {
     value?: number;
@@ -52,25 +50,20 @@ export interface KTCData {
 }
 
 // ============================================================================
-// Player Types (updated to match backend merged data structure)
+// Player Types
 // ============================================================================
 export interface Player {
-    // Core identifiers (from both Sleeper and KTC)
     player_id?: string;
     sleeper_player_id?: string;
     playerName?: string;
     first_name?: string;
     last_name?: string;
-
-    // Team and position info
     team?: string;
     position?: string;
     fantasy_positions?: string[];
-
-    // Physical attributes (from Sleeper)
     age?: number;
     birth_date?: string;
-    height?: string; // Legacy field
+    height?: string;
     heightFeet?: number;
     heightInches?: number;
     weight?: string;
@@ -78,21 +71,15 @@ export interface Player {
     years_exp?: number;
     number?: number;
     depth_chart_position?: number;
-
-    // Status information
     status?: string;
     injury_status?: string | null;
-
-    // KTC ranking data
     ktc?: KTCData;
-
-    // Future: Backend integrated ownership data (not yet implemented)
     owned?: number;
     started?: number;
 }
 
 // ============================================================================
-// League Data Types (matching backend Sleeper API structure)
+// League Data Types
 // ============================================================================
 export interface RosterSettings {
     wins?: number;
@@ -140,7 +127,6 @@ export interface League {
     status: string;
 }
 
-// Backend league data response structure
 export interface LeagueDataResponse {
     status: 'success';
     league: League;
@@ -148,8 +134,19 @@ export interface LeagueDataResponse {
     users: User[];
 }
 
+/** `data` payload from GET /dashboard/league/:leagueId (bundled dashboard API). */
+export interface DashboardLeagueBundle {
+    league?: League | null;
+    rosters: Roster[];
+    users: User[];
+    /** KTC-style array or id → row (see `playersFromDashboardBundle`). */
+    players: unknown;
+    ownership: PlayerOwnershipData;
+    researchMeta?: ResearchMeta | null;
+}
+
 // ============================================================================
-// Research Data Types (for player analytics)
+// Research Data Types
 // ============================================================================
 export interface ResearchData {
     id: number;
@@ -157,7 +154,7 @@ export interface ResearchData {
     week: number;
     league_type: number;
     player_id: string;
-    research_data: Record<string, unknown>; // Generic research metrics
+    research_data: Record<string, unknown>;
     last_updated: string;
 }
 
@@ -169,7 +166,7 @@ export interface ResearchMeta {
 }
 
 // ============================================================================
-// Rankings Response Types (from KTC endpoints)
+// Rankings Response Types
 // ============================================================================
 export interface RankingsResponse {
     timestamp: string;
@@ -216,7 +213,7 @@ export interface KTCRefreshResponse {
 }
 
 // ============================================================================
-// Combined League Data (for frontend use)
+// Combined League Data
 // ============================================================================
 export interface LeagueData {
     rosters: Roster[];
@@ -225,7 +222,6 @@ export interface LeagueData {
     playerOwnership?: PlayerOwnershipData;
 }
 
-// Team data structure (computed from league data)
 export interface TeamData {
     roster: Roster;
     user: User;
@@ -236,7 +232,7 @@ export interface TeamData {
 }
 
 // ============================================================================
-// Player Ownership Types (legacy structure for research data)
+// Player Ownership Types
 // ============================================================================
 export interface PlayerOwnershipStats {
     owned: number;
@@ -271,28 +267,19 @@ export interface PlayerDBSchema extends DBSchema {
 // League Context Types
 // ============================================================================
 export interface LeagueContextType {
-    // Raw data states (single source of truth)
     rosters: Roster[];
     users: User[];
     players: Record<string, Player>;
     playerOwnership: PlayerOwnershipData;
-
-    // League metadata from backend
     league: League | null;
     researchMeta: ResearchMeta | null;
     championUserId: string | null;
-
-    // Computed state
     teamsData: TeamData[];
-    teamsDataPreview: TeamData[];
-
-    // UI state
     loading: boolean;
-    playersLoading: boolean;
+    refreshing: boolean;
     error: string | null;
     selectedLeagueId: string;
     setSelectedLeagueId: (id: string) => void;
-
-    // Actions
+    /** Re-fetches the dashboard bundle; only KTC values are merged into existing players. */
     refreshData: () => Promise<void>;
 }

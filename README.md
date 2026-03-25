@@ -2,7 +2,7 @@
 
 Fantasy and dynasty football dashboard combining KeepTradeCut player valuations with Sleeper league data.
 
-**[Live Demo](https://sleeper-dashboard-xi.vercel.app/)**
+**[View Site](https://sleeper-dashboard-xi.vercel.app/)**
 
 ## Setup
 

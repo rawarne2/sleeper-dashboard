@@ -1,4 +1,3 @@
-// src/Dashboard.tsx — main shell: state, handlers, and page-level render only.
 import React, { useState } from 'react';
 import { TrophyIcon, InformationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useLeague } from './useLeague';
@@ -10,20 +9,20 @@ import { TeamData } from './types';
 const { LEAGUES } = API_CONFIG;
 
 const POSITIONS = [
-  { pos: 'QB', bg: 'bg-red-500',    label: 'Quarterback' },
-  { pos: 'RB', bg: 'bg-green-500',  label: 'Running Back' },
-  { pos: 'WR', bg: 'bg-blue-500',   label: 'Wide Receiver' },
-  { pos: 'TE', bg: 'bg-amber-500',  label: 'Tight End' },
-  { pos: 'K',  bg: 'bg-purple-500', label: 'Kicker' },
-  { pos: 'DEF', bg: 'bg-cyan-500',  label: 'Defense' },
+  { pos: 'QB', bg: 'bg-red-500', label: 'Quarterback' },
+  { pos: 'RB', bg: 'bg-green-500', label: 'Running Back' },
+  { pos: 'WR', bg: 'bg-blue-500', label: 'Wide Receiver' },
+  { pos: 'TE', bg: 'bg-amber-500', label: 'Tight End' },
+  { pos: 'K', bg: 'bg-purple-500', label: 'Kicker' },
+  { pos: 'DEF', bg: 'bg-cyan-500', label: 'Defense' },
 ];
 
 const OWNERSHIP_TIERS = [
-  { color: 'text-green-300',  range: '≥ 90%', label: 'Very High' },
-  { color: 'text-blue-300',   range: '65–89%', label: 'High' },
+  { color: 'text-green-300', range: '≥ 90%', label: 'Very High' },
+  { color: 'text-blue-300', range: '65–89%', label: 'High' },
   { color: 'text-yellow-300', range: '30–64%', label: 'Mid' },
-  { color: 'text-red-300',    range: '8–29%',  label: 'Low' },
-  { color: 'text-gray-400',   range: '< 8%',   label: 'Fringe' },
+  { color: 'text-red-300', range: '8–29%', label: 'Low' },
+  { color: 'text-gray-400', range: '< 8%', label: 'Fringe' },
 ];
 
 const LegendModal = ({ onClose }: { onClose: () => void }) => (
@@ -90,16 +89,16 @@ const LegendModal = ({ onClose }: { onClose: () => void }) => (
 const DynastyDashboardV2: React.FC = () => {
   const {
     teamsData,
-    teamsDataPreview,
     playerOwnership,
     league,
     researchMeta,
     championUserId,
     loading,
-    playersLoading,
+    refreshing,
     error,
     selectedLeagueId,
     setSelectedLeagueId,
+    refreshData,
   } = useLeague();
 
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
@@ -145,11 +144,10 @@ const DynastyDashboardV2: React.FC = () => {
 
   const researchMetaBanner = (compact = false) =>
     researchMeta && (
-      <div className={`mx-3 mb-3 rounded bg-white/3 border border-white/6 text-xs text-gray-400 flex flex-wrap items-center gap-x-2 ${compact ? 'px-3 py-2 gap-y-0.5' : 'p-2'}`}>
+      <div className={`mx-3 mb-3 rounded bg-white/3 border border-white/6 text-xs text-gray-400 flex flex-wrap items-center justify-between gap-x-2 ${compact ? 'px-3 py-2 gap-y-0.5' : 'p-2'}`}>
         <span className='text-gray-300 font-medium'>
-          Ownership data: Wk {researchMeta.week} · {researchMeta.season} · {researchMeta.league_type?.toString()}
+          Ownership data: Wk {researchMeta.week} · {researchMeta.season}
         </span>
-        <span className='text-gray-500'>·</span>
         <span>
           Last updated:{' '}
           {new Date(researchMeta.last_updated).toLocaleString('en-US', {
@@ -194,12 +192,26 @@ const DynastyDashboardV2: React.FC = () => {
                 </span>
               )}
               <button
-                className='btn-ghost flex items-center gap-1 text-xs text-gray-300 hover:text-white border border-gray-500/50 hover:border-gray-300 rounded-full px-2 py-0.5 transition-colors'
+                type='button'
+                className='btn-ghost flex items-center gap-1 text-xs text-gray-300 hover:text-white border border-gray-500/50 hover:border-gray-300 rounded-full px-2 py-0.5 transition-colors disabled:opacity-50'
                 onClick={() => setLegendOpen(true)}
                 aria-label='Open legend'
               >
                 <InformationCircleIcon className='w-4 h-4' />
                 Legend
+              </button>
+              <button
+                type='button'
+                className='btn-ghost flex items-center gap-1 text-xs text-gray-300 hover:text-white border border-gray-500/50 hover:border-gray-300 rounded-full px-2 py-0.5 transition-colors disabled:opacity-50'
+                onClick={() => refreshData()}
+                disabled={refreshing || loading}
+                title='Refreshes KTC player valuations for this league'
+                aria-label='Refresh KTC valuations'
+              >
+                {refreshing && (
+                  <div className='animate-spin rounded-full h-3 w-3 border-t border-b border-gray-300 shrink-0' />
+                )}
+                {refreshing ? 'Refreshing…' : 'Refresh'}
               </button>
             </div>
           </div>
@@ -229,18 +241,6 @@ const DynastyDashboardV2: React.FC = () => {
           <div className='flex flex-col justify-center items-center h-[50vh] gap-3'>
             <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-main' />
             <div className='text-xl'>Loading league data…</div>
-          </div>
-        ) : playersLoading ? (
-          <div className='grid grid-cols-1 gap-4'>
-            <div className='bg-background-paper justify-center rounded-lg'>
-              {standingsHeading}
-              {researchMetaBanner(true)}
-              <div className='flex items-center justify-center gap-2 px-4 pb-4 text-sm text-gray-400'>
-                <div className='animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-main shrink-0' />
-                <span>Loading KTC player data in background — expand a team after it finishes to see rosters.</span>
-              </div>
-              {renderTeamList(teamsDataPreview, true)}
-            </div>
           </div>
         ) : (
           <div className='grid grid-cols-1 gap-4'>

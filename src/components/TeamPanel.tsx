@@ -1,4 +1,3 @@
-// Team card component.
 import { memo } from 'react';
 import {
   ChevronUpIcon,

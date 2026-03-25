@@ -29,6 +29,9 @@ const PositionChip = ({ player }: { player: Player }) => (
 
 const COL_A = 'bg-white/[0.04]';
 
+const theadSticky = 'sticky top-0 z-10 bg-[#0d1e2e]';
+const thBase = 'text-xs sm:text-sm font-medium text-gray-400';
+
 const PlayerDetailRow = memo(({ player }: { player: Player }) => (
   <tr>
     <td colSpan={7} className='p-0 align-top'>
@@ -176,7 +179,7 @@ const PlayerRow = memo(({
           )}
         </td>
 
-        <td className='p-1.5 w-[50px] text-center align-middle'>
+        <td className='p-1.5 w-[50px] text-center align-middle border-l border-white/10'>
           <span className='text-sm font-medium tabular-nums text-gray-100'>
             {player.ktc?.superflexValues?.tep?.value ?? '—'}
           </span>
@@ -204,7 +207,7 @@ const PlayerRow = memo(({
           </div>
         </td>
 
-        <td className='p-1.5 w-7 align-middle text-center'>
+        <td className={`p-1.5 w-7 align-middle text-center ${COL_A}`}>
           {expandedPlayer === player.player_id
             ? <ChevronUpIcon className='h-5 w-5 inline' />
             : <ChevronDownIcon className='h-5 w-5 inline' />
@@ -235,20 +238,29 @@ export const RosterTable = memo(({
 }: RosterTableProps) => (
   <div className='rounded-md overflow-x-auto border border-white/[0.07]'>
     <table className='min-w-full border-collapse'>
-      <thead className='sticky top-0 z-10 bg-[#0d1e2e]'>
+      <thead className='bg-[#0d1e2e]'>
         <tr className='border-b border-white/8'>
-          <th className={`p-2 text-sm font-medium text-left text-gray-400 ${COL_A}`}>Player</th>
-          <th className='p-1.5 w-10 text-sm font-medium text-center text-gray-400'>Own</th>
-          <th className={`p-1.5 w-10 text-sm font-medium text-center text-gray-400 ${COL_A}`}>Start</th>
-          <th className='p-1.5 w-[50px] text-sm font-medium text-right text-gray-400'>
-            <span className='flex flex-col sm:flex-row sm:justify-end sm:gap-1 leading-tight'>
-              <span>KTC</span>
-              <span>Value</span>
-            </span>
+          <th className={`${theadSticky} p-2 text-left ${thBase} ${COL_A}`}>Player</th>
+          <th className={`${theadSticky} p-1.5 w-10 text-center ${thBase}`}>Own</th>
+          <th className={`${theadSticky} p-1.5 w-10 text-center ${thBase} ${COL_A}`}>Start</th>
+          <th
+            colSpan={3}
+            scope='colgroup'
+            className={`${theadSticky} border-l border-white/10 p-1.5 ${thBase}`}
+          >
+            <div className='flex flex-col items-stretch gap-1'>
+              <div className='text-center text-[10px] sm:text-xs font-medium tracking-wide text-gray-400'>
+                KTC
+              </div>
+              <div className='h-px w-full bg-white/20' aria-hidden />
+              <div className='grid gap-1 grid-cols-[minmax(2.75rem,3.25rem)_1fr_1fr]'>
+                <div className='text-center'>Value</div>
+                <div className={`text-center ${COL_A}`}>Rank</div>
+                <div className='text-center'>Tier</div>
+              </div>
+            </div>
           </th>
-          <th className={`p-1.5 w-10 text-sm font-medium text-center text-gray-400 ${COL_A}`}>Rank</th>
-          <th className='p-1.5 w-10 text-sm font-medium text-center text-gray-400'>Tier</th>
-          <th className='w-7'></th>
+          <th className={`${theadSticky} w-7 ${COL_A}`} aria-hidden />
         </tr>
       </thead>
       <tbody>
