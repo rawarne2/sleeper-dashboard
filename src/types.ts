@@ -104,6 +104,8 @@ export interface Roster {
     starters: string[];
     players: string[];
     reserve?: string[];
+    /** Sleeper roster.metadata (optional; may be absent on older API payloads). */
+    roster_metadata?: Record<string, unknown>;
     settings: RosterSettings;
 }
 
@@ -143,6 +145,8 @@ export interface DashboardLeagueBundle {
     players: unknown;
     ownership: PlayerOwnershipData;
     researchMeta?: ResearchMeta | null;
+    /** ISO timestamp when roster-scoped KTC rows were last written (server UTC). */
+    ktcLastUpdated?: string | null;
 }
 
 // ============================================================================
@@ -248,6 +252,11 @@ export interface PlayerOwnershipData {
 // ============================================================================
 import { DBSchema } from 'idb';
 
+export interface AppPrefLeagueId {
+    key: 'league_id';
+    leagueId: string;
+}
+
 export interface PlayerDBSchema extends DBSchema {
     players: {
         key: string;
@@ -261,6 +270,10 @@ export interface PlayerDBSchema extends DBSchema {
         key: string;
         value: PlayerOwnershipStats & { player_id: string; key: string };
     };
+    app_prefs: {
+        key: string;
+        value: AppPrefLeagueId;
+    };
 }
 
 // ============================================================================
@@ -273,13 +286,19 @@ export interface LeagueContextType {
     playerOwnership: PlayerOwnershipData;
     league: League | null;
     researchMeta: ResearchMeta | null;
+    /** ISO string from bundle `ktcLastUpdated`; null if unknown or no KTC rows. */
+    ktcLastUpdated: string | null;
     championUserId: string | null;
     teamsData: TeamData[];
     loading: boolean;
     refreshing: boolean;
     error: string | null;
+    /** True after IndexedDB league preference has been read. */
+    leagueIdReady: boolean;
     selectedLeagueId: string;
     setSelectedLeagueId: (id: string) => void;
+    /** Remove stored league id and return to the entry screen. */
+    clearStoredLeague: () => void;
     /** Re-fetches the dashboard bundle; only KTC values are merged into existing players. */
     refreshData: () => Promise<void>;
 }

@@ -6,7 +6,9 @@ import { getLeagueStatusInfo } from './utils/teamStats';
 import { TeamPanel, STAT_DESCRIPTIONS } from './components/TeamPanel';
 import { TeamData } from './types';
 
-const { LEAGUES } = API_CONFIG;
+const { EXAMPLE_LEAGUE_ID, EXAMPLE_LEAGUES } = API_CONFIG;
+
+const LEAGUE_ID_PATTERN = /^\d{10,24}$/;
 
 const POSITIONS = [
   { pos: 'QB', bg: 'bg-red-500', label: 'Quarterback' },
@@ -24,6 +26,16 @@ const OWNERSHIP_TIERS = [
   { color: 'text-red-300', range: '8–29%', label: 'Low' },
   { color: 'text-gray-400', range: '< 8%', label: 'Fringe' },
 ];
+
+function formatDashboardDateTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 
 const LegendModal = ({ onClose }: { onClose: () => void }) => (
   <div
@@ -92,18 +104,23 @@ const DynastyDashboardV2: React.FC = () => {
     playerOwnership,
     league,
     researchMeta,
+    ktcLastUpdated,
     championUserId,
     loading,
     refreshing,
     error,
+    leagueIdReady,
     selectedLeagueId,
     setSelectedLeagueId,
+    clearStoredLeague,
     refreshData,
   } = useLeague();
 
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [draftLeagueId, setDraftLeagueId] = useState('');
+  const [idError, setIdError] = useState<string | null>(null);
 
   const handleTeamClick = (rosterId: number) => {
     setExpandedTeam(expandedTeam === rosterId ? null : rosterId);
@@ -116,10 +133,112 @@ const DynastyDashboardV2: React.FC = () => {
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
+  if (!leagueIdReady) {
+    return (
+      <div className='bg-background-default text-white min-h-screen p-3 flex flex-col justify-center items-center gap-3'>
+        <div className='animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-main' />
+        <div className='text-gray-300'>Loading saved preferences…</div>
+      </div>
+    );
+  }
+
+  if (!selectedLeagueId) {
+    const onSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      const trimmed = draftLeagueId.trim();
+      if (!LEAGUE_ID_PATTERN.test(trimmed)) {
+        setIdError('Enter a numeric Sleeper league ID (from the league URL or settings).');
+        return;
+      }
+      setIdError(null);
+      setSelectedLeagueId(trimmed);
+    };
+
+    return (
+      <div className='bg-background-default text-white min-h-screen relative'>
+        <div className='absolute inset-0 bg-black/55 backdrop-blur-[2px]' aria-hidden />
+        <div
+          className='relative z-10 min-h-screen flex items-center justify-center p-4'
+          role='dialog'
+          aria-modal='true'
+          aria-labelledby='league-modal-title'
+        >
+          <div
+            className='w-full max-w-md rounded-xl border border-gray-500/40 bg-[#0f1729] p-6 shadow-2xl ring-1 ring-white/10'
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className='flex items-center gap-2 mb-4'>
+              <TrophyIcon className='w-8 h-8 text-primary-main shrink-0' />
+              <h1 id='league-modal-title' className='text-xl font-semibold'>
+                Sleeper Dynasty Dashboard
+              </h1>
+            </div>
+            <p className='text-sm text-gray-400 mb-4'>
+              Your league ID is saved in this browser (IndexedDB). Pick an example below or paste your
+              own from Sleeper (League Settings or the league URL).
+            </p>
+            <form onSubmit={onSubmit} className='flex flex-col gap-3'>
+              <label htmlFor='example-league-select' className='text-sm font-medium text-gray-300'>
+                Example leagues
+              </label>
+              <select
+                id='example-league-select'
+                value={EXAMPLE_LEAGUES.some((l) => l.id === draftLeagueId) ? draftLeagueId : ''}
+                onChange={(ev) => {
+                  const v = ev.target.value;
+                  setDraftLeagueId(v);
+                  setIdError(null);
+                }}
+                className='bg-gray-800 text-white border border-gray-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-main'
+              >
+                <option value=''>Choose an example…</option>
+                {EXAMPLE_LEAGUES.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.label} · {l.id}
+                  </option>
+                ))}
+              </select>
+              <label htmlFor='league-id-input' className='text-sm font-medium text-gray-300'>
+                Or enter league ID
+              </label>
+              <input
+                id='league-id-input'
+                type='text'
+                inputMode='numeric'
+                autoComplete='off'
+                placeholder={EXAMPLE_LEAGUE_ID}
+                value={draftLeagueId}
+                onChange={(ev) => {
+                  setDraftLeagueId(ev.target.value);
+                  setIdError(null);
+                }}
+                className='bg-gray-800 text-white border border-gray-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-main font-mono'
+              />
+              {idError && <p className='text-sm text-red-400'>{idError}</p>}
+              <button
+                type='submit'
+                className='mt-1 rounded-lg bg-primary-main text-white py-2.5 px-4 text-sm font-semibold shadow-md hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary-main focus:ring-offset-2 focus:ring-offset-[#0f1729]'
+              >
+                Load league
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
-      <div className='bg-background-default text-white min-h-screen p-3 flex justify-center items-center'>
-        <div className='text-xl text-red-500'>{error}</div>
+      <div className='bg-background-default text-white min-h-screen p-3 flex flex-col justify-center items-center gap-4'>
+        <div className='text-xl text-red-500 text-center max-w-lg'>{error}</div>
+        <button
+          type='button'
+          className='text-sm text-gray-400 underline hover:text-white'
+          onClick={() => clearStoredLeague()}
+        >
+          Use a different league ID
+        </button>
       </div>
     );
   }
@@ -150,13 +269,7 @@ const DynastyDashboardV2: React.FC = () => {
         </span>
         <span>
           Last updated:{' '}
-          {new Date(researchMeta.last_updated).toLocaleString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            hour: 'numeric',
-            minute: '2-digit',
-          })}
+          {formatDashboardDateTime(researchMeta.last_updated)}
         </span>
       </div>
     );
@@ -200,37 +313,46 @@ const DynastyDashboardV2: React.FC = () => {
                 <InformationCircleIcon className='w-4 h-4' />
                 Legend
               </button>
-              <button
-                type='button'
-                className='btn-ghost flex items-center gap-1 text-xs text-gray-300 hover:text-white border border-gray-500/50 hover:border-gray-300 rounded-full px-2 py-0.5 transition-colors disabled:opacity-50'
-                onClick={() => refreshData()}
-                disabled={refreshing || loading}
-                title='Refreshes KTC player valuations for this league'
-                aria-label='Refresh KTC valuations'
-              >
-                {refreshing && (
-                  <div className='animate-spin rounded-full h-3 w-3 border-t border-b border-gray-300 shrink-0' />
+              <div className='flex flex-col items-end gap-1 shrink-0'>
+                <button
+                  type='button'
+                  className='inline-flex items-center justify-center gap-2 rounded-lg bg-primary-main px-4 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/10 transition hover:brightness-110 disabled:pointer-events-none disabled:opacity-45'
+                  onClick={() => refreshData()}
+                  disabled={refreshing || loading}
+                  title='Requests a fresh KTC scrape on the server, then reloads this league’s data'
+                  aria-label='Refresh KTC Data'
+                >
+                  {refreshing && (
+                    <span className='inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white' />
+                  )}
+                  {refreshing ? 'Refreshing…' : 'Refresh KTC Data'}
+                </button>
+                {!loading && (
+                  <p className='text-xs sm:text-sm text-gray-400 text-right max-w-[min(100%,14rem)] leading-tight'>
+                    Last updated:{' '}
+                    <span className='text-gray-300 tabular-nums'>
+                      {ktcLastUpdated ? formatDashboardDateTime(ktcLastUpdated) : '—'}
+                    </span>
+                  </p>
                 )}
-                {refreshing ? 'Refreshing…' : 'Refresh'}
-              </button>
+              </div>
             </div>
           </div>
 
-          {/* League selector */}
-          <div className='flex items-center gap-2'>
-            <label htmlFor='league-select' className='text-sm font-medium whitespace-nowrap'>
-              League:
-            </label>
-            <select
-              id='league-select'
-              value={selectedLeagueId}
-              onChange={(e) => setSelectedLeagueId(e.target.value)}
-              className='bg-gray-600 text-white border border-gray-500 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-main'
+          <div className='flex flex-wrap items-center gap-2 text-sm text-gray-300'>
+            <span className='font-mono text-gray-200'>League ID: {selectedLeagueId}</span>
+            {league?.name && (
+              <span className='text-gray-400 truncate max-w-[min(100%,12rem)] sm:max-w-md'>
+                · {league.name}
+              </span>
+            )}
+            <button
+              type='button'
+              className='ml-auto text-xs text-gray-400 hover:text-white underline'
+              onClick={() => clearStoredLeague()}
             >
-              {LEAGUES.map((l) => (
-                <option key={l.id} value={l.id}>{l.label}</option>
-              ))}
-            </select>
+              Change league
+            </button>
           </div>
         </div>
       </div>
@@ -256,9 +378,8 @@ const DynastyDashboardV2: React.FC = () => {
       {/* ── Footer ── */}
       <div className='py-3 px-2 mt-auto bg-background-paper/70 text-center'>
         <div className='text-sm text-gray-400'>
-          Sleeper Dynasty League Dashboard •{' '}
-          {LEAGUES.find((l) => l.id === selectedLeagueId)?.label} •
-          ID: {selectedLeagueId}
+          Sleeper Dynasty League Dashboard
+          {league?.name ? ` · ${league.name}` : ''} · ID: {selectedLeagueId}
         </div>
       </div>
     </div>

@@ -19,10 +19,12 @@ import {
   DashboardLeagueBundle,
 } from './types';
 import { storePlayers, playersFromDashboardBundle } from './playerFunctions';
-import { API_CONFIG, buildApiUrl } from './apiConfig';
+import { API_CONFIG, buildApiUrl, EXAMPLE_LEAGUES } from './apiConfig';
 import { LeagueContext } from './leagueContextValue';
 
-const { LEAGUES, BATCH_SIZE } = API_CONFIG;
+const { BATCH_SIZE } = API_CONFIG;
+const DB_NAME = 'sleeper-players-db';
+const DB_VERSION = 2;
 
 interface LeagueProviderProps {
   children: ReactNode;
@@ -35,29 +37,85 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const [playerOwnership, setPlayerOwnership] = useState<PlayerOwnershipData>({});
   const [league, setLeague] = useState<League | null>(null);
   const [researchMeta, setResearchMeta] = useState<ResearchMeta | null>(null);
+  const [ktcLastUpdated, setKtcLastUpdated] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedLeagueId, setSelectedLeagueId] = useState<string>(
-    LEAGUES[0].id
-  );
-
-  const currentSeason = useMemo(() => {
-    return (
-      LEAGUES.find((league) => league.id === selectedLeagueId)?.season || 2025
-    );
-  }, [selectedLeagueId]);
+  const [leagueIdReady, setLeagueIdReady] = useState(false);
+  const [selectedLeagueId, setSelectedLeagueIdState] = useState('');
 
   const initDB = useCallback(async () => {
-    return openDB<PlayerDBSchema>('sleeper-players-db', 1, {
-      upgrade(db) {
-        db.createObjectStore('players', { keyPath: 'player_id' });
-        db.createObjectStore('metadata', { keyPath: 'key' });
-        db.createObjectStore('ownership', { keyPath: 'key' });
+    return openDB<PlayerDBSchema>(DB_NAME, DB_VERSION, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore('players', { keyPath: 'player_id' });
+          db.createObjectStore('metadata', { keyPath: 'key' });
+          db.createObjectStore('ownership', { keyPath: 'key' });
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore('app_prefs', { keyPath: 'key' });
+        }
       },
     });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const db = await initDB();
+        const row = await db.get('app_prefs', 'league_id');
+        if (!cancelled) {
+          setSelectedLeagueIdState((row?.leagueId ?? '').trim());
+          setLeagueIdReady(true);
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setLeagueIdReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initDB]);
+
+  useEffect(() => {
+    if (!leagueIdReady) return;
+    if (!selectedLeagueId) {
+      setLoading(false);
+      return;
+    }
+    void (async () => {
+      const db = await initDB();
+      await db.put('app_prefs', { key: 'league_id', leagueId: selectedLeagueId });
+    })();
+  }, [leagueIdReady, selectedLeagueId, initDB]);
+
+  const setSelectedLeagueId = useCallback((id: string) => {
+    setSelectedLeagueIdState(id.trim());
+  }, []);
+
+  const clearStoredLeague = useCallback(() => {
+    setSelectedLeagueIdState('');
+    setLoading(false);
+    setRosters([]);
+    setUsers([]);
+    setPlayers({});
+    setPlayerOwnership({});
+    setLeague(null);
+    setResearchMeta(null);
+    setKtcLastUpdated(null);
+    setError(null);
+    void (async () => {
+      try {
+        const db = await initDB();
+        await db.delete('app_prefs', 'league_id');
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [initDB]);
 
   const persistOwnershipSeason = useCallback(
     async (
@@ -88,10 +146,15 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   );
 
   const fetchBundle = useCallback(async () => {
+    const example = EXAMPLE_LEAGUES.find((l) => l.id === selectedLeagueId);
+    const seasonParam = String(
+      example?.season ?? new Date().getFullYear()
+    );
+
     const bundleUrl = buildApiUrl(
       API_CONFIG.ENDPOINTS.DASHBOARD_LEAGUE(selectedLeagueId),
       {
-        season: String(currentSeason),
+        season: seasonParam,
         league_format: 'superflex',
         is_redraft: 'false',
         tep_level: 'tep',
@@ -108,9 +171,12 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     }
 
     if (!response.ok) {
-      throw new Error(
-        `Failed to fetch dashboard data: ${response.status} ${response.statusText}`
-      );
+      const errBody = await response.json().catch(() => ({}));
+      const msg =
+        typeof (errBody as { error?: string }).error === 'string'
+          ? (errBody as { error: string }).error
+          : `Failed to fetch dashboard data: ${response.status} ${response.statusText}`;
+      throw new Error(msg);
     }
 
     const apiResponse = (await response.json()) as {
@@ -139,7 +205,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     }
 
     return { data, playersMap };
-  }, [selectedLeagueId, currentSeason]);
+  }, [selectedLeagueId]);
 
   const loadFullData = useCallback(async () => {
     setLoading(true);
@@ -149,12 +215,16 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       const { data, playersMap } = await fetchBundle();
 
       await storePlayers(db, playersMap);
-      await persistOwnershipSeason(db, currentSeason, data.ownership);
+      const seasonNum = parseInt(data.league?.season ?? '', 10);
+      if (!Number.isNaN(seasonNum)) {
+        await persistOwnershipSeason(db, seasonNum, data.ownership);
+      }
 
       setRosters(data.rosters);
       setUsers(data.users);
       setLeague(data.league ?? null);
       setResearchMeta(data.researchMeta ?? null);
+      setKtcLastUpdated(data.ktcLastUpdated ?? null);
       setPlayers(playersMap);
       setPlayerOwnership(data.ownership);
     } catch (err) {
@@ -163,37 +233,49 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentSeason, initDB, fetchBundle, persistOwnershipSeason]);
+  }, [initDB, fetchBundle, persistOwnershipSeason]);
 
-  /** Re-fetches the bundle but only merges `ktc` (and ktc-sourced fields) into existing players. */
   const refreshData = useCallback(async () => {
     setRefreshing(true);
     setError(null);
     try {
-      const { playersMap } = await fetchBundle();
-
-      setPlayers((prev) => {
-        const merged = { ...prev };
-        for (const [id, freshPlayer] of Object.entries(playersMap)) {
-          if (merged[id]) {
-            merged[id] = {
-              ...merged[id],
-              ktc: freshPlayer.ktc,
-              age: freshPlayer.age,
-              heightFeet: freshPlayer.heightFeet,
-              heightInches: freshPlayer.heightInches,
-            };
-          }
-        }
-        return merged;
+      const refreshUrl = buildApiUrl(API_CONFIG.ENDPOINTS.KTC_REFRESH, {
+        league_format: 'superflex',
+        is_redraft: 'false',
+        tep_level: 'tep',
       });
+      const scrapeRes = await fetch(refreshUrl, { method: 'POST' });
+      if (!scrapeRes.ok) {
+        const body = await scrapeRes.json().catch(() => ({}));
+        throw new Error(
+          (body as Record<string, string>).error ??
+            `KTC refresh failed: ${scrapeRes.status}`
+        );
+      }
+
+      const db = await initDB();
+      const { data, playersMap } = await fetchBundle();
+
+      await storePlayers(db, playersMap);
+      const seasonNum = parseInt(data.league?.season ?? '', 10);
+      if (!Number.isNaN(seasonNum)) {
+        await persistOwnershipSeason(db, seasonNum, data.ownership);
+      }
+
+      setRosters(data.rosters);
+      setUsers(data.users);
+      setLeague(data.league ?? null);
+      setResearchMeta(data.researchMeta ?? null);
+      setKtcLastUpdated(data.ktcLastUpdated ?? null);
+      setPlayers(playersMap);
+      setPlayerOwnership(data.ownership);
     } catch (err) {
       console.error('Error refreshing KTC data:', err);
       setError(`Failed to refresh KTC data. ${err}`);
     } finally {
       setRefreshing(false);
     }
-  }, [fetchBundle]);
+  }, [initDB, fetchBundle, persistOwnershipSeason]);
 
   const teamsData = useMemo((): TeamData[] => {
     if (
@@ -263,8 +345,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   }, [league, rosters, users]);
 
   useEffect(() => {
+    if (!leagueIdReady || !selectedLeagueId) return;
     loadFullData();
-  }, [loadFullData]);
+  }, [leagueIdReady, selectedLeagueId, loadFullData]);
 
   const contextValue: LeagueContextType = {
     rosters,
@@ -273,13 +356,16 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     playerOwnership,
     league,
     researchMeta,
+    ktcLastUpdated,
     championUserId,
     teamsData,
     loading,
     refreshing,
     error,
+    leagueIdReady,
     selectedLeagueId,
     setSelectedLeagueId,
+    clearStoredLeague,
     refreshData,
   };
 
