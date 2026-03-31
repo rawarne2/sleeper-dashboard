@@ -22,8 +22,3 @@ npm test  # Run unit tests
 ## Configuration
 
 - **League ID:** On first visit, pick from **Example leagues** (saved IDs for 2024–2026 seasons) or paste your own; the choice is stored in IndexedDB (`app_prefs`). Use **Change league** to clear it. Edit `EXAMPLE_LEAGUES` in `src/apiConfig.ts` to change the dropdown list.
-- **Production API:** Set `VITE_API_URL` to your deployed API base (Vercel env or `.env`; see `.env.example`).
-
-## Pending changes (not committed)
-
-- Example league list, `apiConfig` base URL handling, and league context/types aligned with the backend dashboard route. Copy `.env.example` for local `VITE_API_URL` if needed.

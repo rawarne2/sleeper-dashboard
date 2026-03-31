@@ -6,7 +6,8 @@ export const EXAMPLE_LEAGUES = [
 ] as const;
 
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.DEV ? 'http://localhost:5001/api' : import.meta.env.VITE_API_URL,
+  BASE_URL:
+    (import.meta.env.DEV ? 'http://localhost:5001/api' : import.meta.env.VITE_API_URL) ?? '',
 
   EXAMPLE_LEAGUES,
 
