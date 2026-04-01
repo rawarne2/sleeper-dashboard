@@ -27,13 +27,19 @@ const OWNERSHIP_TIERS = [
   { color: 'text-gray-400', range: '< 8%', label: 'Fringe' },
 ];
 
-function formatDashboardDateTime(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', {
+/** API sends RFC 3339 instants with explicit `Z` or offset. */
+function formatApiInstant(iso: string): string {
+  const s = iso.trim();
+  if (!s) return '—';
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString(undefined, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZoneName: 'short',
   });
 }
 
@@ -269,7 +275,7 @@ const DynastyDashboardV2: React.FC = () => {
         </span>
         <span>
           Last updated:{' '}
-          {formatDashboardDateTime(researchMeta.last_updated)}
+          {formatApiInstant(researchMeta.last_updated)}
         </span>
       </div>
     );
@@ -285,77 +291,86 @@ const DynastyDashboardV2: React.FC = () => {
       {legendOpen && <LegendModal onClose={() => setLegendOpen(false)} />}
 
       {/* ── Header ── */}
-      <div className='top-0 z-10 shadow-md bg-linear-to-r from-gradient-start to-gradient-end'>
-        <div className='p-3 sm:p-4 my-2 sm:my-1 bg-gray-700 text-white rounded-lg flex flex-col gap-2'>
-          {/* Title + league meta pills */}
-          <div className='flex items-center justify-between flex-wrap gap-2'>
-            <div className='flex items-center gap-2'>
-              <TrophyIcon className='w-6 h-6' />
-              <div className='text-base sm:text-xl font-semibold'>Sleeper Dynasty Dashboard</div>
-            </div>
-            <div className='flex items-center gap-2 flex-wrap'>
-              {leagueStatus && (
-                <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${leagueStatus.className}`}>
-                  {leagueStatus.label}
-                </span>
-              )}
-              {league?.total_rosters != null && (
-                <span className='text-xs rounded-full px-2 py-0.5 bg-gray-600/40 text-gray-300 border border-gray-500/30'>
-                  {league.total_rosters} Teams
-                </span>
-              )}
-              <button
-                type='button'
-                className='btn-ghost flex items-center gap-1 text-xs text-gray-300 hover:text-white border border-gray-500/50 hover:border-gray-300 rounded-full px-2 py-0.5 transition-colors disabled:opacity-50'
-                onClick={() => setLegendOpen(true)}
-                aria-label='Open legend'
-              >
-                <InformationCircleIcon className='w-4 h-4' />
-                Legend
-              </button>
-              <div className='flex flex-col items-end gap-1 shrink-0'>
-                <button
-                  type='button'
-                  className='inline-flex items-center justify-center gap-2 rounded-lg bg-primary-main px-4 py-2 text-sm font-semibold text-white shadow-md ring-1 ring-white/10 transition hover:brightness-110 disabled:pointer-events-none disabled:opacity-45'
-                  onClick={() => refreshData()}
-                  disabled={refreshing || loading}
-                  title='Requests a fresh KTC scrape on the server, then reloads this league’s data'
-                  aria-label='Refresh KTC Data'
-                >
-                  {refreshing && (
-                    <span className='inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white' />
-                  )}
-                  {refreshing ? 'Refreshing…' : 'Refresh KTC Data'}
-                </button>
-                {!loading && (
-                  <p className='text-xs sm:text-sm text-gray-400 text-right max-w-[min(100%,14rem)] leading-tight'>
-                    Last updated:{' '}
-                    <span className='text-gray-300 tabular-nums'>
-                      {ktcLastUpdated ? formatDashboardDateTime(ktcLastUpdated) : '—'}
-                    </span>
-                  </p>
+      <header className='border-b border-white/10 bg-[#0d1e2e]'>
+        <div className='mx-auto flex w-full max-w-xl flex-col gap-3 px-3 py-4 sm:max-w-2xl sm:gap-4 sm:px-5 sm:py-5 md:max-w-4xl md:px-6 lg:max-w-5xl'>
+          {/* Brand, league identity, status — centered on all breakpoints */}
+          <div className='flex flex-col items-center text-center'>
+            <div className='min-w-0 max-w-full space-y-2 sm:max-w-[min(100%,28rem)] md:max-w-[min(100%,36rem)]'>
+              <h1 className='text-sm font-semibold leading-snug tracking-tight text-white sm:text-base'>
+                Sleeper Dynasty Dashboard
+              </h1>
+              <div className='space-y-1'>
+                {league?.name ? (
+                  <div
+                    className='text-balance text-base font-semibold text-gray-100 sm:text-lg'
+                    title={league.name}
+                  >
+                    {league.name}
+                  </div>
+                ) : null}
+                <div className='font-mono text-xs tabular-nums text-gray-400 sm:text-sm'>
+                  ID {selectedLeagueId}
+                </div>
+              </div>
+              <div className='flex flex-wrap items-center justify-center gap-2'>
+                {leagueStatus && (
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium sm:text-sm ${leagueStatus.className}`}
+                  >
+                    {leagueStatus.label}
+                  </span>
+                )}
+                {league?.total_rosters != null && (
+                  <span className='inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-gray-300 sm:text-sm'>
+                    {league.total_rosters} teams
+                  </span>
                 )}
               </div>
             </div>
           </div>
 
-          <div className='flex flex-wrap items-center gap-2 text-sm text-gray-300'>
-            <span className='font-mono text-gray-200'>League ID: {selectedLeagueId}</span>
-            {league?.name && (
-              <span className='text-gray-400 truncate max-w-[min(100%,12rem)] sm:max-w-md'>
-                · {league.name}
-              </span>
-            )}
+          {/* Controls + KTC: narrow column on mobile, centered row on tablet/desktop */}
+          <div className='flex flex-col items-center gap-3 border-t border-white/10 pt-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-2 sm:gap-y-2 md:gap-x-3'>
             <button
               type='button'
-              className='ml-auto text-xs text-gray-400 hover:text-white underline'
+              className='inline-flex w-full max-w-sm items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white sm:w-auto sm:max-w-none sm:text-sm'
+              onClick={() => setLegendOpen(true)}
+              aria-label='Open legend'
+            >
+              <InformationCircleIcon className='h-4 w-4 shrink-0' />
+              Legend
+            </button>
+            <button
+              type='button'
+              className='inline-flex w-full max-w-sm items-center justify-center rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white sm:w-auto sm:max-w-none sm:text-sm'
               onClick={() => clearStoredLeague()}
             >
               Change league
             </button>
+            <button
+              type='button'
+              className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-lg bg-primary-main px-4 py-2.5 text-sm font-semibold text-white shadow-lg ring-1 ring-white/10 transition-[filter,opacity] hover:brightness-110 disabled:pointer-events-none disabled:opacity-45 sm:w-auto sm:max-w-none sm:px-4 sm:py-2'
+              onClick={() => refreshData()}
+              disabled={refreshing || loading}
+              title='Requests a fresh KTC scrape on the server, then reloads this league’s data'
+              aria-label='Refresh KTC Data'
+            >
+              {refreshing && (
+                <span className='inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white' />
+              )}
+              {refreshing ? 'Refreshing…' : 'Refresh KTC Data'}
+            </button>
+            {!loading && (
+              <p className='w-full max-w-sm text-center text-xs leading-snug text-gray-400 sm:max-w-none sm:basis-full sm:text-sm'>
+                KTC last updated{' '}
+                <span className='font-medium tabular-nums text-gray-300'>
+                  {ktcLastUpdated ? formatApiInstant(ktcLastUpdated) : '—'}
+                </span>
+              </p>
+            )}
           </div>
         </div>
-      </div>
+      </header>
 
       {/* ── Main content ── */}
       <div className='flex-1'>
