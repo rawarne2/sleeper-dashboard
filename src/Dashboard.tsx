@@ -27,6 +27,102 @@ const OWNERSHIP_TIERS = [
   { color: 'text-gray-400', range: '< 8%', label: 'Fringe' },
 ];
 
+type LeaguePickerCardProps = {
+  titleId: string;
+  description: React.ReactNode;
+  draftLeagueId: string;
+  setDraftLeagueId: (v: string) => void;
+  idError: string | null;
+  setIdError: (v: string | null) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  exampleSelectId: string;
+  leagueInputId: string;
+  onClose?: () => void;
+};
+
+const LeaguePickerCard = ({
+  titleId,
+  description,
+  draftLeagueId,
+  setDraftLeagueId,
+  idError,
+  setIdError,
+  onSubmit,
+  exampleSelectId,
+  leagueInputId,
+  onClose,
+}: LeaguePickerCardProps) => (
+  <div
+    className='relative w-full max-w-md rounded-xl border border-gray-500/40 bg-[#0f1729] p-6 pt-7 shadow-2xl ring-1 ring-white/10 sm:pt-6'
+    onClick={(e) => e.stopPropagation()}
+  >
+    {onClose ? (
+      <button
+        type='button'
+        className='btn-ghost absolute top-3 right-3 text-gray-400 hover:text-white'
+        onClick={onClose}
+        aria-label='Close without changing league'
+      >
+        <XMarkIcon className='w-5 h-5' />
+      </button>
+    ) : null}
+    <div
+      className={`mb-4 flex items-center justify-center gap-2 ${onClose ? 'pr-8' : ''}`}
+    >
+      <TrophyIcon className='h-8 w-8 shrink-0 text-primary-main' />
+      <h1 id={titleId} className='text-lg font-semibold sm:text-xl'>
+        Sleeper Dynasty Dashboard
+      </h1>
+    </div>
+    <div className='mb-4 text-sm text-gray-400'>{description}</div>
+    <form onSubmit={onSubmit} className='flex flex-col gap-3'>
+      <label htmlFor={exampleSelectId} className='text-sm font-medium text-gray-300'>
+        Example leagues
+      </label>
+      <select
+        id={exampleSelectId}
+        value={EXAMPLE_LEAGUES.some((l) => l.id === draftLeagueId) ? draftLeagueId : ''}
+        onChange={(ev) => {
+          const v = ev.target.value;
+          setDraftLeagueId(v);
+          setIdError(null);
+        }}
+        className='rounded-lg border border-gray-500 bg-gray-800 px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-main'
+      >
+        <option value=''>Select an example season…</option>
+        {EXAMPLE_LEAGUES.map((l) => (
+          <option key={l.id} value={l.id}>
+            {l.label} · {l.id}
+          </option>
+        ))}
+      </select>
+      <label htmlFor={leagueInputId} className='text-sm font-medium text-gray-300'>
+        Or enter league ID
+      </label>
+      <input
+        id={leagueInputId}
+        type='text'
+        inputMode='numeric'
+        autoComplete='off'
+        placeholder={EXAMPLE_LEAGUE_ID}
+        value={draftLeagueId}
+        onChange={(ev) => {
+          setDraftLeagueId(ev.target.value);
+          setIdError(null);
+        }}
+        className='rounded-lg border border-gray-500 bg-gray-800 px-3 py-2.5 font-mono text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-main'
+      />
+      {idError ? <p className='text-sm text-red-400'>{idError}</p> : null}
+      <button
+        type='submit'
+        className='mt-1 rounded-lg bg-primary-main px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary-main focus:ring-offset-2 focus:ring-offset-[#0f1729]'
+      >
+        Load league
+      </button>
+    </form>
+  </div>
+);
+
 /** API sends RFC 3339 instants with explicit `Z` or offset. */
 function formatApiInstant(iso: string): string {
   const s = iso.trim();
@@ -125,6 +221,7 @@ const DynastyDashboardV2: React.FC = () => {
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [leaguePickerOpen, setLeaguePickerOpen] = useState(false);
   const [draftLeagueId, setDraftLeagueId] = useState('');
   const [idError, setIdError] = useState<string | null>(null);
 
@@ -164,71 +261,27 @@ const DynastyDashboardV2: React.FC = () => {
       <div className='bg-background-default text-white min-h-screen relative'>
         <div className='absolute inset-0 bg-black/55 backdrop-blur-[2px]' aria-hidden />
         <div
-          className='relative z-10 min-h-screen flex items-center justify-center p-4'
+          className='relative z-10 flex min-h-screen items-center justify-center p-4'
           role='dialog'
           aria-modal='true'
           aria-labelledby='league-modal-title'
         >
-          <div
-            className='w-full max-w-md rounded-xl border border-gray-500/40 bg-[#0f1729] p-6 shadow-2xl ring-1 ring-white/10'
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className='flex items-center gap-2 mb-4'>
-              <TrophyIcon className='w-8 h-8 text-primary-main shrink-0' />
-              <h1 id='league-modal-title' className='text-xl font-semibold'>
-                Sleeper Dynasty Dashboard
-              </h1>
-            </div>
-            <p className='text-sm text-gray-400 mb-4'>
-              Your league ID is saved in this browser (IndexedDB). Pick an example below or paste your
-              own from Sleeper (League Settings or the league URL).
-            </p>
-            <form onSubmit={onSubmit} className='flex flex-col gap-3'>
-              <label htmlFor='example-league-select' className='text-sm font-medium text-gray-300'>
-                Example leagues
-              </label>
-              <select
-                id='example-league-select'
-                value={EXAMPLE_LEAGUES.some((l) => l.id === draftLeagueId) ? draftLeagueId : ''}
-                onChange={(ev) => {
-                  const v = ev.target.value;
-                  setDraftLeagueId(v);
-                  setIdError(null);
-                }}
-                className='bg-gray-800 text-white border border-gray-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-main'
-              >
-                <option value=''>Choose an example…</option>
-                {EXAMPLE_LEAGUES.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.label} · {l.id}
-                  </option>
-                ))}
-              </select>
-              <label htmlFor='league-id-input' className='text-sm font-medium text-gray-300'>
-                Or enter league ID
-              </label>
-              <input
-                id='league-id-input'
-                type='text'
-                inputMode='numeric'
-                autoComplete='off'
-                placeholder={EXAMPLE_LEAGUE_ID}
-                value={draftLeagueId}
-                onChange={(ev) => {
-                  setDraftLeagueId(ev.target.value);
-                  setIdError(null);
-                }}
-                className='bg-gray-800 text-white border border-gray-500 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-main font-mono'
-              />
-              {idError && <p className='text-sm text-red-400'>{idError}</p>}
-              <button
-                type='submit'
-                className='mt-1 rounded-lg bg-primary-main text-white py-2.5 px-4 text-sm font-semibold shadow-md hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary-main focus:ring-offset-2 focus:ring-offset-[#0f1729]'
-              >
-                Load league
-              </button>
-            </form>
-          </div>
+          <LeaguePickerCard
+            titleId='league-modal-title'
+            description={
+              <>
+                Your league ID is saved in this browser. Pick an example below or paste your
+                own from Sleeper League (find in settings or the league URL).
+              </>
+            }
+            draftLeagueId={draftLeagueId}
+            setDraftLeagueId={setDraftLeagueId}
+            idError={idError}
+            setIdError={setIdError}
+            onSubmit={onSubmit}
+            exampleSelectId='example-league-select'
+            leagueInputId='league-id-input'
+          />
         </div>
       </div>
     );
@@ -286,9 +339,57 @@ const DynastyDashboardV2: React.FC = () => {
     </div>
   );
 
+  const closeLeaguePicker = () => {
+    setLeaguePickerOpen(false);
+    setIdError(null);
+  };
+
+  const onSubmitLeagueChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = draftLeagueId.trim();
+    if (!LEAGUE_ID_PATTERN.test(trimmed)) {
+      setIdError('Enter a numeric Sleeper league ID (from the league URL or settings).');
+      return;
+    }
+    setIdError(null);
+    setSelectedLeagueId(trimmed);
+    setLeaguePickerOpen(false);
+  };
+
   return (
     <div className='bg-background-default text-white min-h-screen flex flex-col w-full'>
       {legendOpen && <LegendModal onClose={() => setLegendOpen(false)} />}
+      {leaguePickerOpen ? (
+        <div
+          className='fixed inset-0 z-9999 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]'
+          onClick={closeLeaguePicker}
+          role='presentation'
+        >
+          <div
+            role='dialog'
+            aria-modal='true'
+            aria-labelledby='league-change-modal-title'
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <LeaguePickerCard
+              titleId='league-change-modal-title'
+              description={
+                <>
+                  Your league ID is saved in this browser.
+                </>
+              }
+              draftLeagueId={draftLeagueId}
+              setDraftLeagueId={setDraftLeagueId}
+              idError={idError}
+              setIdError={setIdError}
+              onSubmit={onSubmitLeagueChange}
+              exampleSelectId='example-league-select-change'
+              leagueInputId='league-id-input-change'
+              onClose={closeLeaguePicker}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Header ── */}
       <header className='border-b border-white/10 bg-[#0d1e2e]'>
@@ -296,7 +397,7 @@ const DynastyDashboardV2: React.FC = () => {
           {/* Brand, league identity, status — centered on all breakpoints */}
           <div className='flex flex-col items-center text-center'>
             <div className='min-w-0 max-w-full space-y-2 sm:max-w-[min(100%,28rem)] md:max-w-[min(100%,36rem)]'>
-              <h1 className='text-sm font-semibold leading-snug tracking-tight text-white sm:text-base'>
+              <h1 className='text-xs font-semibold leading-snug tracking-tight text-white sm:text-sm'>
                 Sleeper Dynasty Dashboard
               </h1>
               <div className='space-y-1'>
@@ -305,7 +406,7 @@ const DynastyDashboardV2: React.FC = () => {
                     className='text-balance text-base font-semibold text-gray-100 sm:text-lg'
                     title={league.name}
                   >
-                    {league.name}
+                    <span className='text-gray-300 font-'>League:</span> {league.name}
                   </div>
                 ) : null}
                 <div className='font-mono text-xs tabular-nums text-gray-400 sm:text-sm'>
@@ -343,7 +444,11 @@ const DynastyDashboardV2: React.FC = () => {
             <button
               type='button'
               className='inline-flex w-full max-w-sm items-center justify-center rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white sm:w-auto sm:max-w-none sm:text-sm'
-              onClick={() => clearStoredLeague()}
+              onClick={() => {
+                setDraftLeagueId(selectedLeagueId);
+                setIdError(null);
+                setLeaguePickerOpen(true);
+              }}
             >
               Change league
             </button>

@@ -1,8 +1,8 @@
 /** Known example leagues for the entry-screen quick pick (id + label for all users). */
 export const EXAMPLE_LEAGUES = [
-  { id: '1333945997071515648', label: '2026 Season', season: 2026 },
-  { id: '1210364682523656192', label: '2025 Season', season: 2025 },
-  { id: '1050831680350568448', label: '2024 Season', season: 2024 },
+  { id: '1333945997071515648', label: '(2026)', season: 2026 },
+  { id: '1210364682523656192', label: '(2025)', season: 2025 },
+  { id: '1050831680350568448', label: '(2024)', season: 2024 },
 ] as const;
 
 export const API_CONFIG = {
