@@ -2,12 +2,12 @@ import { Player, RosterSettings } from '../types';
 
 export function getLeagueStatusInfo(status: string): { label: string; className: string } {
   switch (status.toLowerCase()) {
-    case 'in_season':  return { label: 'In Season',  className: 'bg-green-600/20 text-green-400 border border-green-600/30' };
-    case 'post_season': return { label: 'Playoffs',   className: 'bg-purple-600/20 text-purple-400 border border-purple-600/30' };
-    case 'pre_draft':  return { label: 'Pre-Draft',  className: 'bg-blue-600/20 text-blue-400 border border-blue-600/30' };
-    case 'drafting':   return { label: 'Drafting',   className: 'bg-yellow-600/20 text-yellow-400 border border-yellow-600/30' };
-    case 'complete':   return { label: 'Complete',   className: 'bg-gray-600/20 text-gray-400 border border-gray-600/30' };
-    default:           return { label: status,       className: 'bg-gray-600/20 text-gray-400 border border-gray-600/30' };
+    case 'in_season': return { label: 'In Season', className: 'bg-green-600/20 text-green-400 border border-green-600/30' };
+    case 'post_season': return { label: 'Playoffs', className: 'bg-purple-600/20 text-purple-400 border border-purple-600/30' };
+    case 'pre_draft': return { label: 'Pre-Draft', className: 'bg-blue-600/20 text-blue-400 border border-blue-600/30' };
+    case 'drafting': return { label: 'Drafting', className: 'bg-yellow-600/20 text-yellow-400 border border-yellow-600/30' };
+    case 'complete': return { label: 'Season Completed', className: 'bg-gray-600/20 text-gray-400 border border-gray-600/30' };
+    default: return { label: status, className: 'bg-gray-600/20 text-gray-400 border border-gray-600/30' };
   }
 }
 
@@ -15,25 +15,23 @@ export function getOwnershipTier(pct: number): string {
   if (pct >= 90) return 'text-green-300';
   if (pct >= 65) return 'text-blue-300';
   if (pct >= 30) return 'text-yellow-300';
-  if (pct >= 8)  return 'text-red-300';
+  if (pct >= 8) return 'text-red-300';
   return 'text-gray-400';
 }
 
 export function formatBirthDate(birthDate: string): string {
-  try {
-    // Append T00:00:00 to avoid timezone-shifting the date
-    const d = new Date(birthDate + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  } catch {
-    return birthDate;
-  }
+  // Append T00:00:00 so the ISO date is parsed in local time and not shifted by tz.
+  const d = new Date(birthDate + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return birthDate;
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 export function formatHeight(player: Player): string {
-  if (player?.heightFeet != null && player?.heightInches != null) {
-    return `${player.heightFeet}'${player.heightInches}"`;
-  }
-  return 'N/A';
+  return player.height && player.height.trim().length > 0 ? player.height : 'N/A';
 }
 
 export function getTeamRecord(s: RosterSettings): string {

@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Player } from '../types';
 import { formatBirthDate, formatHeight, getOwnershipTier } from '../utils/teamStats';
+import { formatPoints } from '../utils/formatting';
 
 export type OwnershipMap = Record<string, { owned: number; started?: number }>;
 
@@ -28,13 +29,12 @@ const PositionChip = ({ player }: { player: Player }) => (
 );
 
 const COL_A = 'bg-white/[0.04]';
-
 const theadSticky = 'sticky top-0 z-10 bg-[#0d1e2e]';
 const thBase = 'text-xs sm:text-sm font-medium text-gray-400';
 
 const PlayerDetailRow = memo(({ player }: { player: Player }) => (
   <tr>
-    <td colSpan={7} className='p-0 align-top'>
+    <td colSpan={10} className='p-0 align-top'>
       <div className='player-detail-row'>
         <div className='player-detail-grid'>
           <div className='player-detail-item'>
@@ -63,9 +63,7 @@ const PlayerDetailRow = memo(({ player }: { player: Player }) => (
           {player.injury_status && (
             <div className='player-detail-item'>
               <CalendarIcon className='player-detail-icon text-red-500' />
-              <span className='text-sm text-red-400'>
-                Injury: {player.injury_status}
-              </span>
+              <span className='text-sm text-red-400'>Injury: {player.injury_status}</span>
             </div>
           )}
 
@@ -112,9 +110,10 @@ const SectionDivider = ({
 }) => (
   <tr className='bg-[#0d1a27]'>
     <td
-      colSpan={7}
-      className={`px-3 py-1.5 text-sm font-semibold uppercase tracking-wider ${isReserve ? 'text-red-400/70' : 'text-gray-500'
-        }`}
+      colSpan={10}
+      className={`px-3 py-1.5 text-sm font-semibold uppercase tracking-wider ${
+        isReserve ? 'text-red-400/70' : 'text-gray-500'
+      }`}
     >
       {label}{' '}
       <span className='font-normal normal-case tracking-normal text-gray-400'>
@@ -132,92 +131,105 @@ interface PlayerRowProps {
   playerOwnership: OwnershipMap;
 }
 
-const PlayerRow = memo(({
-  player,
-  isReserve = false,
-  expandedPlayer,
-  onPlayerClick,
-  playerOwnership,
-}: PlayerRowProps) => {
-  const ownership = resolveOwnership(player, playerOwnership);
-  const owned = ownership?.owned;
-  const started = ownership?.started;
+const PlayerRow = memo(
+  ({ player, isReserve = false, expandedPlayer, onPlayerClick, playerOwnership }: PlayerRowProps) => {
+    const ownership = resolveOwnership(player, playerOwnership);
+    const owned = ownership?.owned;
+    const started = ownership?.started;
+    const stats = player.stats;
 
-  return (
-    <React.Fragment>
-      <tr
-        className={`hover:bg-white/4 cursor-pointer border-b border-white/5 transition-colors ${isReserve ? 'border-l-2 border-l-red-500/50' : ''
+    return (
+      <React.Fragment>
+        <tr
+          className={`hover:bg-white/4 cursor-pointer border-b border-white/5 transition-colors ${
+            isReserve ? 'border-l-2 border-l-red-500/50' : ''
           }`}
-        onClick={() => player.player_id && onPlayerClick(player.player_id)}
-      >
-        <td className={`p-2 align-middle ${COL_A}`}>
-          <div className='flex items-center gap-2'>
-            <div className='shrink-0'><PositionChip player={player} /></div>
-            <span className='text-sm sm:text-base font-medium text-gray-100 leading-tight min-w-0 truncate'>
-              {player.first_name} {player.last_name}
+          onClick={() => player.player_id && onPlayerClick(player.player_id)}
+        >
+          <td className={`p-2 align-middle ${COL_A}`}>
+            <div className='flex items-center gap-2'>
+              <div className='shrink-0'>
+                <PositionChip player={player} />
+              </div>
+              <span className='text-sm sm:text-base font-medium text-gray-100 leading-tight min-w-0 truncate'>
+                {player.first_name} {player.last_name}
+              </span>
+            </div>
+          </td>
+
+          <td className='p-1.5 w-10 text-center align-middle'>
+            {owned != null ? (
+              <span className={`text-sm font-medium tabular-nums ${getOwnershipTier(owned)}`}>
+                {owned}%
+              </span>
+            ) : (
+              <span className='text-sm text-gray-500'>—</span>
+            )}
+          </td>
+
+          <td className={`p-1.5 w-10 text-center align-middle ${COL_A}`}>
+            {started != null ? (
+              <span className={`text-sm font-medium tabular-nums ${getOwnershipTier(started)}`}>
+                {started}%
+              </span>
+            ) : (
+              <span className='text-sm text-gray-500'>—</span>
+            )}
+          </td>
+
+          <td className='p-1.5 w-12 text-center align-middle border-l border-white/10'>
+            <span className='text-sm font-medium tabular-nums text-gray-100'>
+              {formatPoints(stats?.average_points)}
             </span>
-          </div>
-        </td>
+          </td>
+          <td className={`p-1.5 w-14 text-center align-middle tabular-nums ${COL_A}`}>
+            <span className='text-sm text-gray-100'>{formatPoints(stats?.total_points)}</span>
+          </td>
+          <td className='p-1.5 w-10 text-center align-middle tabular-nums'>
+            <span className='text-sm text-gray-100'>{stats?.games_played ?? '—'}</span>
+          </td>
 
-        <td className='p-1.5 w-10 text-center align-middle'>
-          {owned != null ? (
-            <span className={`text-sm font-medium tabular-nums ${getOwnershipTier(owned)}`}>
-              {owned}%
+          <td className={`p-1.5 w-[50px] text-center align-middle border-l border-white/10 ${COL_A}`}>
+            <span className='text-sm font-medium tabular-nums text-gray-100'>
+              {player.ktc?.superflexValues?.tep?.value ?? '—'}
             </span>
-          ) : (
-            <span className='text-sm text-gray-500'>—</span>
-          )}
-        </td>
+          </td>
 
-        <td className={`p-1.5 w-10 text-center align-middle ${COL_A}`}>
-          {started != null ? (
-            <span className={`text-sm font-medium tabular-nums ${getOwnershipTier(started)}`}>
-              {started}%
-            </span>
-          ) : (
-            <span className='text-sm text-gray-500'>—</span>
-          )}
-        </td>
-
-        <td className='p-1.5 w-[50px] text-center align-middle border-l border-white/10'>
-          <span className='text-sm font-medium tabular-nums text-gray-100'>
-            {player.ktc?.superflexValues?.tep?.value ?? '—'}
-          </span>
-        </td>
-
-        <td className={`p-1.5 text-center align-middle whitespace-nowrap ${COL_A}`}>
-          <div className='text-sm leading-snug'>
-            <div className='text-gray-100 font-medium'>
-              {player.position} {player.ktc?.superflexValues?.tep?.positionalRank ?? '—'}
+          <td className='p-1.5 text-center align-middle whitespace-nowrap'>
+            <div className='text-sm leading-snug'>
+              <div className='text-gray-100 font-medium'>
+                {player.position} {player.ktc?.superflexValues?.tep?.positionalRank ?? '—'}
+              </div>
+              <div className='text-gray-400 font-medium'>
+                OVR {player.ktc?.superflexValues?.tep?.rank ?? '—'}
+              </div>
             </div>
-            <div className='text-gray-400 font-medium'>
-              OVR {player.ktc?.superflexValues?.tep?.rank ?? '—'}
-            </div>
-          </div>
-        </td>
+          </td>
 
-        <td className='p-1.5 text-center align-middle whitespace-nowrap'>
-          <div className='text-sm leading-snug'>
-            <div className='text-gray-100 font-medium'>
-              {player.position} T{player.ktc?.superflexValues?.tep?.positionalTier ?? '—'}
+          <td className={`p-1.5 text-center align-middle whitespace-nowrap ${COL_A}`}>
+            <div className='text-sm leading-snug'>
+              <div className='text-gray-100 font-medium'>
+                {player.position} T{player.ktc?.superflexValues?.tep?.positionalTier ?? '—'}
+              </div>
+              <div className='text-gray-400 font-medium'>
+                OVR T{player.ktc?.superflexValues?.tep?.overallTier ?? '—'}
+              </div>
             </div>
-            <div className='text-gray-400 font-medium'>
-              OVR T{player.ktc?.superflexValues?.tep?.overallTier ?? '—'}
-            </div>
-          </div>
-        </td>
+          </td>
 
-        <td className={`p-1.5 w-7 align-middle text-center ${COL_A}`}>
-          {expandedPlayer === player.player_id
-            ? <ChevronUpIcon className='h-5 w-5 inline' />
-            : <ChevronDownIcon className='h-5 w-5 inline' />
-          }
-        </td>
-      </tr>
-      {expandedPlayer === player.player_id && <PlayerDetailRow player={player} />}
-    </React.Fragment>
-  );
-});
+          <td className='p-1.5 w-7 align-middle text-center'>
+            {expandedPlayer === player.player_id ? (
+              <ChevronUpIcon className='h-5 w-5 inline' />
+            ) : (
+              <ChevronDownIcon className='h-5 w-5 inline' />
+            )}
+          </td>
+        </tr>
+        {expandedPlayer === player.player_id && <PlayerDetailRow player={player} />}
+      </React.Fragment>
+    );
+  }
+);
 
 export interface RosterTableProps {
   starters: Player[];
@@ -228,78 +240,90 @@ export interface RosterTableProps {
   playerOwnership: OwnershipMap;
 }
 
-export const RosterTable = memo(({
-  starters,
-  bench,
-  reserve,
-  expandedPlayer,
-  onPlayerClick,
-  playerOwnership,
-}: RosterTableProps) => (
-  <div className='rounded-md overflow-x-auto border border-white/[0.07]'>
-    <table className='min-w-full border-collapse'>
-      <thead className='bg-[#0d1e2e]'>
-        <tr className='border-b border-white/8'>
-          <th className={`${theadSticky} p-2 text-left ${thBase} ${COL_A}`}>Player</th>
-          <th className={`${theadSticky} p-1.5 w-10 text-center ${thBase}`}>Own</th>
-          <th className={`${theadSticky} p-1.5 w-10 text-center ${thBase} ${COL_A}`}>Start</th>
-          <th
-            colSpan={3}
-            scope='colgroup'
-            className={`${theadSticky} border-l border-white/10 p-1.5 ${thBase}`}
-          >
-            <div className='flex flex-col items-stretch gap-1'>
-              <div className='text-center text-[10px] sm:text-xs font-medium tracking-wide text-gray-400'>
-                KTC
+export const RosterTable = memo(
+  ({ starters, bench, reserve, expandedPlayer, onPlayerClick, playerOwnership }: RosterTableProps) => (
+    <div className='rounded-md overflow-x-auto border border-white/[0.07]'>
+      <table className='min-w-full border-collapse'>
+        <thead className='bg-[#0d1e2e]'>
+          <tr className='border-b border-white/8'>
+            <th className={`${theadSticky} p-2 text-left ${thBase} ${COL_A}`}>Player</th>
+            <th className={`${theadSticky} p-1.5 w-10 text-center ${thBase}`}>Own</th>
+            <th className={`${theadSticky} p-1.5 w-10 text-center ${thBase} ${COL_A}`}>Start</th>
+            <th
+              colSpan={3}
+              scope='colgroup'
+              className={`${theadSticky} border-l border-white/10 p-1.5 ${thBase}`}
+            >
+              <div className='flex flex-col items-stretch gap-1'>
+                <div className='text-center text-[10px] sm:text-xs font-medium tracking-wide text-gray-400'>
+                  Season Stats
+                </div>
+                <div className='h-px w-full bg-white/20' aria-hidden />
+                <div className='grid gap-1 grid-cols-3'>
+                  <div className='text-center'>Avg</div>
+                  <div className={`text-center ${COL_A}`}>Total</div>
+                  <div className='text-center'>GP</div>
+                </div>
               </div>
-              <div className='h-px w-full bg-white/20' aria-hidden />
-              <div className='grid gap-1 grid-cols-[minmax(2.75rem,3.25rem)_1fr_1fr]'>
-                <div className='text-center'>Value</div>
-                <div className={`text-center ${COL_A}`}>Rank</div>
-                <div className='text-center'>Tier</div>
+            </th>
+            <th
+              colSpan={3}
+              scope='colgroup'
+              className={`${theadSticky} border-l border-white/10 p-1.5 ${thBase}`}
+            >
+              <div className='flex flex-col items-stretch gap-1'>
+                <div className='text-center text-[10px] sm:text-xs font-medium tracking-wide text-gray-400'>
+                  KTC
+                </div>
+                <div className='h-px w-full bg-white/20' aria-hidden />
+                <div className='grid gap-1 grid-cols-[minmax(2.75rem,3.25rem)_1fr_1fr]'>
+                  <div className={`text-center ${COL_A}`}>Value</div>
+                  <div className='text-center'>Rank</div>
+                  <div className={`text-center ${COL_A}`}>Tier</div>
+                </div>
               </div>
-            </div>
-          </th>
-          <th className={`${theadSticky} w-7 ${COL_A}`} aria-hidden />
-        </tr>
-      </thead>
-      <tbody>
-        <SectionDivider label='Starters' count={starters.length} />
-        {starters.map((p) => (
-          <PlayerRow
-            key={p.player_id}
-            player={p}
-            expandedPlayer={expandedPlayer}
-            onPlayerClick={onPlayerClick}
-            playerOwnership={playerOwnership}
-          />
-        ))}
-        <SectionDivider label='Bench' count={bench.length} />
-        {bench.map((p) => (
-          <PlayerRow
-            key={p.player_id}
-            player={p}
-            expandedPlayer={expandedPlayer}
-            onPlayerClick={onPlayerClick}
-            playerOwnership={playerOwnership}
-          />
-        ))}
-        {reserve.length > 0 && (
-          <>
-            <SectionDivider label='Reserve / IR' count={reserve.length} isReserve />
-            {reserve.map((p) => (
-              <PlayerRow
-                key={p.player_id}
-                player={p}
-                isReserve
-                expandedPlayer={expandedPlayer}
-                onPlayerClick={onPlayerClick}
-                playerOwnership={playerOwnership}
-              />
-            ))}
-          </>
-        )}
-      </tbody>
-    </table>
-  </div>
-));
+            </th>
+            <th className={`${theadSticky} w-7`} aria-hidden />
+          </tr>
+        </thead>
+        <tbody>
+          <SectionDivider label='Starters' count={starters.length} />
+          {starters.map((p) => (
+            <PlayerRow
+              key={p.player_id}
+              player={p}
+              expandedPlayer={expandedPlayer}
+              onPlayerClick={onPlayerClick}
+              playerOwnership={playerOwnership}
+            />
+          ))}
+          <SectionDivider label='Bench' count={bench.length} />
+          {bench.map((p) => (
+            <PlayerRow
+              key={p.player_id}
+              player={p}
+              expandedPlayer={expandedPlayer}
+              onPlayerClick={onPlayerClick}
+              playerOwnership={playerOwnership}
+            />
+          ))}
+          {reserve.length > 0 && (
+            <>
+              <SectionDivider label='Reserve / IR' count={reserve.length} isReserve />
+              {reserve.map((p) => (
+                <PlayerRow
+                  key={p.player_id}
+                  player={p}
+                  isReserve
+                  expandedPlayer={expandedPlayer}
+                  onPlayerClick={onPlayerClick}
+                  playerOwnership={playerOwnership}
+                />
+              ))}
+            </>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+);

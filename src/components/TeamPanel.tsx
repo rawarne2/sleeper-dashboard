@@ -16,19 +16,6 @@ import {
 } from '../utils/teamStats';
 import { RosterTable, OwnershipMap } from './RosterTable';
 
-export const STAT_DESCRIPTIONS: Record<string, string> = {
-  PF:    'Points For: total fantasy points your team has scored this season.',
-  PA:    'Points Against: total fantasy points scored against your team this season.',
-  'PF/G': 'Points For Per Game: average fantasy points scored per week (PF ÷ games played).',
-  'PA/G': 'Points Against Per Game: average points allowed per week (PA ÷ games played).',
-  Diff:  'Point Differential: Points For minus Points Against. Positive = better than opponents on average.',
-  MaxPF: 'Max Potential Points: total points if the optimal starting lineup had been set every week.',
-  'Eff%': 'Manager Efficiency: actual points scored vs. maximum possible (PF ÷ Max PF × 100). Higher = better lineup decisions.',
-  Waiv:  'Waiver Priority: current waiver claim order. Lower number = higher priority.',
-  Moves: 'Total Moves: total number of waiver wire and free agent acquisitions made this season.',
-  FAAB:  'FAAB Spent: Free Agent Acquisition Budget dollars spent this season.',
-};
-
 export interface TeamPanelProps {
   teamData: TeamData;
   index: number;
@@ -146,10 +133,6 @@ export const TeamPanel = memo(({
           <div className='flex flex-col items-center gap-0.5'>
             <span className='text-xs text-gray-400'>Eff%</span>
             <span className='text-gray-100 font-medium tabular-nums text-xs sm:text-sm'>{getEff(s)}</span>
-          </div>
-          <div className='flex flex-col items-center gap-0.5'>
-            <span className='text-xs text-gray-400'>Moves</span>
-            <span className='text-gray-300 text-xs sm:text-sm tabular-nums'>{s.total_moves ?? '—'}</span>
           </div>
           <div className='flex flex-col items-center gap-0.5'>
             <span className='text-xs text-gray-400'>FAAB</span>

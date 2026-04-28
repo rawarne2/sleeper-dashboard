@@ -1,229 +1,34 @@
 import React, { useState } from 'react';
-import { TrophyIcon, InformationCircleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { useLeague } from './useLeague';
-import { API_CONFIG } from './apiConfig';
 import { getLeagueStatusInfo } from './utils/teamStats';
-import { TeamPanel, STAT_DESCRIPTIONS } from './components/TeamPanel';
-import { TeamData } from './types';
+// import { formatApiInstant } from './utils/formatting';
+import { TeamPanel } from './components/TeamPanel';
+import { LeaguePickerCard } from './components/LeaguePickerCard';
+import { LegendModal } from './components/LegendModal';
 
-const { EXAMPLE_LEAGUE_ID, EXAMPLE_LEAGUES } = API_CONFIG;
-
-const LEAGUE_ID_PATTERN = /^\d{10,24}$/;
-
-const POSITIONS = [
-  { pos: 'QB', bg: 'bg-red-500', label: 'Quarterback' },
-  { pos: 'RB', bg: 'bg-green-500', label: 'Running Back' },
-  { pos: 'WR', bg: 'bg-blue-500', label: 'Wide Receiver' },
-  { pos: 'TE', bg: 'bg-amber-500', label: 'Tight End' },
-  { pos: 'K', bg: 'bg-purple-500', label: 'Kicker' },
-  { pos: 'DEF', bg: 'bg-cyan-500', label: 'Defense' },
-];
-
-const OWNERSHIP_TIERS = [
-  { color: 'text-green-300', range: '≥ 90%', label: 'Very High' },
-  { color: 'text-blue-300', range: '65–89%', label: 'High' },
-  { color: 'text-yellow-300', range: '30–64%', label: 'Mid' },
-  { color: 'text-red-300', range: '8–29%', label: 'Low' },
-  { color: 'text-gray-400', range: '< 8%', label: 'Fringe' },
-];
-
-type LeaguePickerCardProps = {
-  titleId: string;
-  description: React.ReactNode;
-  draftLeagueId: string;
-  setDraftLeagueId: (v: string) => void;
-  idError: string | null;
-  setIdError: (v: string | null) => void;
-  onSubmit: (e: React.FormEvent) => void;
-  exampleSelectId: string;
-  leagueInputId: string;
-  onClose?: () => void;
-};
-
-const LeaguePickerCard = ({
-  titleId,
-  description,
-  draftLeagueId,
-  setDraftLeagueId,
-  idError,
-  setIdError,
-  onSubmit,
-  exampleSelectId,
-  leagueInputId,
-  onClose,
-}: LeaguePickerCardProps) => (
-  <div
-    className='relative w-full max-w-md rounded-xl border border-gray-500/40 bg-[#0f1729] p-6 pt-7 shadow-2xl ring-1 ring-white/10 sm:pt-6'
-    onClick={(e) => e.stopPropagation()}
-  >
-    {onClose ? (
-      <button
-        type='button'
-        className='btn-ghost absolute top-3 right-3 text-gray-400 hover:text-white'
-        onClick={onClose}
-        aria-label='Close without changing league'
-      >
-        <XMarkIcon className='w-5 h-5' />
-      </button>
-    ) : null}
-    <div
-      className={`mb-4 flex items-center justify-center gap-2 ${onClose ? 'pr-8' : ''}`}
-    >
-      <TrophyIcon className='h-8 w-8 shrink-0 text-primary-main' />
-      <h1 id={titleId} className='text-lg font-semibold sm:text-xl'>
-        Sleeper Dynasty Dashboard
-      </h1>
-    </div>
-    <div className='mb-4 text-sm text-gray-400'>{description}</div>
-    <form onSubmit={onSubmit} className='flex flex-col gap-3'>
-      <label htmlFor={exampleSelectId} className='text-sm font-medium text-gray-300'>
-        Example leagues
-      </label>
-      <select
-        id={exampleSelectId}
-        value={EXAMPLE_LEAGUES.some((l) => l.id === draftLeagueId) ? draftLeagueId : ''}
-        onChange={(ev) => {
-          const v = ev.target.value;
-          setDraftLeagueId(v);
-          setIdError(null);
-        }}
-        className='rounded-lg border border-gray-500 bg-gray-800 px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-main'
-      >
-        <option value=''>Select an example season…</option>
-        {EXAMPLE_LEAGUES.map((l) => (
-          <option key={l.id} value={l.id}>
-            {l.label} · {l.id}
-          </option>
-        ))}
-      </select>
-      <label htmlFor={leagueInputId} className='text-sm font-medium text-gray-300'>
-        Or enter league ID
-      </label>
-      <input
-        id={leagueInputId}
-        type='text'
-        inputMode='numeric'
-        autoComplete='off'
-        placeholder={EXAMPLE_LEAGUE_ID}
-        value={draftLeagueId}
-        onChange={(ev) => {
-          setDraftLeagueId(ev.target.value);
-          setIdError(null);
-        }}
-        className='rounded-lg border border-gray-500 bg-gray-800 px-3 py-2.5 font-mono text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-main'
-      />
-      {idError ? <p className='text-sm text-red-400'>{idError}</p> : null}
-      <button
-        type='submit'
-        className='mt-1 rounded-lg bg-primary-main px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-primary-main focus:ring-offset-2 focus:ring-offset-[#0f1729]'
-      >
-        Load league
-      </button>
-    </form>
-  </div>
-);
-
-/** API sends RFC 3339 instants with explicit `Z` or offset. */
-function formatApiInstant(iso: string): string {
-  const s = iso.trim();
-  if (!s) return '—';
-  const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    timeZoneName: 'short',
-  });
-}
-
-const LegendModal = ({ onClose }: { onClose: () => void }) => (
-  <div
-    className='fixed inset-0 z-9999 flex items-center justify-center p-4 bg-black/60'
-    onClick={onClose}
-  >
-    <div
-      className='relative bg-[#0d1e2e] border border-white/10 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5'
-      onClick={(e) => e.stopPropagation()}
-    >
-      <button
-        className='btn-ghost absolute top-3 right-3 text-gray-400 hover:text-white'
-        onClick={onClose}
-        aria-label='Close legend'
-      >
-        <XMarkIcon className='w-5 h-5' />
-      </button>
-
-      <h2 className='text-base sm:text-lg font-bold text-white mb-4'>Dashboard Legend</h2>
-
-      {/* Team Stats */}
-      <section className='mb-5'>
-        <h3 className='text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2'>Team Stats</h3>
-        <div className='grid grid-cols-1 gap-1.5'>
-          {Object.entries(STAT_DESCRIPTIONS).map(([key, desc]) => (
-            <div key={key} className='flex gap-2 text-xs sm:text-sm'>
-              <span className='shrink-0 font-bold text-gray-100 w-10 text-right'>{key}</span>
-              <span className='text-gray-300'>{desc}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Position Colors */}
-      <section className='mb-5'>
-        <h3 className='text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2'>Position Colors</h3>
-        <div className='flex flex-wrap gap-2'>
-          {POSITIONS.map(({ pos, bg, label }) => (
-            <div key={pos} className='flex items-center gap-1.5 text-xs sm:text-sm'>
-              <span className={`${bg} text-white rounded-full px-2 py-0.5 font-medium text-xs min-w-[42px] text-center`}>{pos}</span>
-              <span className='text-gray-300'>{label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Ownership Tier Colors */}
-      <section>
-        <h3 className='text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2'>Ownership % Colors</h3>
-        <div className='flex flex-col gap-1'>
-          {OWNERSHIP_TIERS.map(({ color, range, label }) => (
-            <div key={range} className='flex items-center gap-2 text-xs sm:text-sm'>
-              <span className={`${color} font-semibold tabular-nums w-14 shrink-0`}>{range}</span>
-              <span className='text-gray-300'>{label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  </div>
-);
-
-const DynastyDashboardV2: React.FC = () => {
+const Dashboard: React.FC = () => {
   const {
     teamsData,
     playerOwnership,
     league,
     researchMeta,
-    ktcLastUpdated,
+    // ktcLastUpdated,
     championUserId,
     loading,
-    refreshing,
+    // refreshing,
     error,
     leagueIdReady,
     selectedLeagueId,
     setSelectedLeagueId,
     clearStoredLeague,
-    refreshData,
+    // refreshData,
   } = useLeague();
 
   const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   const [leaguePickerOpen, setLeaguePickerOpen] = useState(false);
-  const [draftLeagueId, setDraftLeagueId] = useState('');
-  const [idError, setIdError] = useState<string | null>(null);
 
   const handleTeamClick = (rosterId: number) => {
     setExpandedTeam(expandedTeam === rosterId ? null : rosterId);
@@ -233,8 +38,6 @@ const DynastyDashboardV2: React.FC = () => {
   const handlePlayerClick = (playerId: string) => {
     setExpandedPlayer(expandedPlayer === playerId ? null : playerId);
   };
-
-  // ─── Render ───────────────────────────────────────────────────────────────
 
   if (!leagueIdReady) {
     return (
@@ -246,17 +49,6 @@ const DynastyDashboardV2: React.FC = () => {
   }
 
   if (!selectedLeagueId) {
-    const onSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      const trimmed = draftLeagueId.trim();
-      if (!LEAGUE_ID_PATTERN.test(trimmed)) {
-        setIdError('Enter a numeric Sleeper league ID (from the league URL or settings).');
-        return;
-      }
-      setIdError(null);
-      setSelectedLeagueId(trimmed);
-    };
-
     return (
       <div className='bg-background-default text-white min-h-screen relative'>
         <div className='absolute inset-0 bg-black/55 backdrop-blur-[2px]' aria-hidden />
@@ -270,17 +62,11 @@ const DynastyDashboardV2: React.FC = () => {
             titleId='league-modal-title'
             description={
               <>
-                Your league ID is saved in this browser. Pick an example below or paste your
-                own from Sleeper League (find in settings or the league URL).
+                Pick an example below or enter your own league ID from Sleeper (find it in
+                your league settings or the league URL).
               </>
             }
-            draftLeagueId={draftLeagueId}
-            setDraftLeagueId={setDraftLeagueId}
-            idError={idError}
-            setIdError={setIdError}
-            onSubmit={onSubmit}
-            exampleSelectId='example-league-select'
-            leagueInputId='league-id-input'
+            onSelect={(id) => setSelectedLeagueId(id)}
           />
         </div>
       </div>
@@ -304,13 +90,13 @@ const DynastyDashboardV2: React.FC = () => {
 
   const leagueStatus = league ? getLeagueStatusInfo(league.status) : null;
 
-  const renderTeamList = (teams: TeamData[], pending: boolean) =>
-    teams.map((team, idx) => (
+  const renderTeamList = () =>
+    teamsData.map((team, idx) => (
       <TeamPanel
         key={team.roster.roster_id}
         teamData={team}
         index={idx}
-        rosterDetailsPending={pending}
+        rosterDetailsPending={false}
         champId={championUserId}
         expandedTeam={expandedTeam}
         onTeamClick={handleTeamClick}
@@ -320,15 +106,11 @@ const DynastyDashboardV2: React.FC = () => {
       />
     ));
 
-  const researchMetaBanner = (compact = false) =>
+  const researchMetaBanner = () =>
     researchMeta && (
-      <div className={`mx-3 mb-3 rounded bg-white/3 border border-white/6 text-xs text-gray-400 flex flex-wrap items-center justify-between gap-x-2 ${compact ? 'px-3 py-2 gap-y-0.5' : 'p-2'}`}>
+      <div className='mx-3 mb-3 rounded bg-white/3 border border-white/6 p-2 text-xs text-gray-400'>
         <span className='text-gray-300 font-medium'>
           Ownership data: Wk {researchMeta.week} · {researchMeta.season}
-        </span>
-        <span>
-          Last updated:{' '}
-          {formatApiInstant(researchMeta.last_updated)}
         </span>
       </div>
     );
@@ -339,30 +121,14 @@ const DynastyDashboardV2: React.FC = () => {
     </div>
   );
 
-  const closeLeaguePicker = () => {
-    setLeaguePickerOpen(false);
-    setIdError(null);
-  };
-
-  const onSubmitLeagueChange = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = draftLeagueId.trim();
-    if (!LEAGUE_ID_PATTERN.test(trimmed)) {
-      setIdError('Enter a numeric Sleeper league ID (from the league URL or settings).');
-      return;
-    }
-    setIdError(null);
-    setSelectedLeagueId(trimmed);
-    setLeaguePickerOpen(false);
-  };
-
   return (
     <div className='bg-background-default text-white min-h-screen flex flex-col w-full'>
       {legendOpen && <LegendModal onClose={() => setLegendOpen(false)} />}
+
       {leaguePickerOpen ? (
         <div
           className='fixed inset-0 z-9999 flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]'
-          onClick={closeLeaguePicker}
+          onClick={() => setLeaguePickerOpen(false)}
           role='presentation'
         >
           <div
@@ -373,28 +139,19 @@ const DynastyDashboardV2: React.FC = () => {
           >
             <LeaguePickerCard
               titleId='league-change-modal-title'
-              description={
-                <>
-                  Your league ID is saved in this browser.
-                </>
-              }
-              draftLeagueId={draftLeagueId}
-              setDraftLeagueId={setDraftLeagueId}
-              idError={idError}
-              setIdError={setIdError}
-              onSubmit={onSubmitLeagueChange}
-              exampleSelectId='example-league-select-change'
-              leagueInputId='league-id-input-change'
-              onClose={closeLeaguePicker}
+              description={<>Your league ID is saved in this browser.</>}
+              onSelect={(id) => {
+                setSelectedLeagueId(id);
+                setLeaguePickerOpen(false);
+              }}
+              onClose={() => setLeaguePickerOpen(false)}
             />
           </div>
         </div>
       ) : null}
 
-      {/* ── Header ── */}
       <header className='border-b border-white/10 bg-[#0d1e2e]'>
         <div className='mx-auto flex w-full max-w-xl flex-col gap-3 px-3 py-4 sm:max-w-2xl sm:gap-4 sm:px-5 sm:py-5 md:max-w-4xl md:px-6 lg:max-w-5xl'>
-          {/* Brand, league identity, status — centered on all breakpoints */}
           <div className='flex flex-col items-center text-center'>
             <div className='min-w-0 max-w-full space-y-2 sm:max-w-[min(100%,28rem)] md:max-w-[min(100%,36rem)]'>
               <h1 className='text-xs font-semibold leading-snug tracking-tight text-white sm:text-sm'>
@@ -406,7 +163,7 @@ const DynastyDashboardV2: React.FC = () => {
                     className='text-balance text-base font-semibold text-gray-100 sm:text-lg'
                     title={league.name}
                   >
-                    <span className='text-gray-300 font-'>League:</span> {league.name}
+                    <span className='text-gray-300 font-normal'>League:</span> {league.name}
                   </div>
                 ) : null}
                 <div className='font-mono text-xs tabular-nums text-gray-400 sm:text-sm'>
@@ -421,6 +178,11 @@ const DynastyDashboardV2: React.FC = () => {
                     {leagueStatus.label}
                   </span>
                 )}
+                {league?.season && (
+                  <span className='inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-gray-300 sm:text-sm'>
+                    {league.season} season
+                  </span>
+                )}
                 {league?.total_rosters != null && (
                   <span className='inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-gray-300 sm:text-sm'>
                     {league.total_rosters} teams
@@ -430,7 +192,6 @@ const DynastyDashboardV2: React.FC = () => {
             </div>
           </div>
 
-          {/* Controls + KTC: narrow column on mobile, centered row on tablet/desktop */}
           <div className='flex flex-col items-center gap-3 border-t border-white/10 pt-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-2 sm:gap-y-2 md:gap-x-3'>
             <button
               type='button'
@@ -444,15 +205,11 @@ const DynastyDashboardV2: React.FC = () => {
             <button
               type='button'
               className='inline-flex w-full max-w-sm items-center justify-center rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white sm:w-auto sm:max-w-none sm:text-sm'
-              onClick={() => {
-                setDraftLeagueId(selectedLeagueId);
-                setIdError(null);
-                setLeaguePickerOpen(true);
-              }}
+              onClick={() => setLeaguePickerOpen(true)}
             >
               Change league
             </button>
-            <button
+            {/* <button  // !!!!!!!!!!!!!!: only use for development
               type='button'
               className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-lg bg-primary-main px-4 py-2.5 text-sm font-semibold text-white shadow-lg ring-1 ring-white/10 transition-[filter,opacity] hover:brightness-110 disabled:pointer-events-none disabled:opacity-45 sm:w-auto sm:max-w-none sm:px-4 sm:py-2'
               onClick={() => refreshData()}
@@ -464,20 +221,19 @@ const DynastyDashboardV2: React.FC = () => {
                 <span className='inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white' />
               )}
               {refreshing ? 'Refreshing…' : 'Refresh KTC Data'}
-            </button>
-            {!loading && (
+            </button> */}
+            {/* {!loading && ktcLastUpdated && (
               <p className='w-full max-w-sm text-center text-xs leading-snug text-gray-400 sm:max-w-none sm:basis-full sm:text-sm'>
                 KTC last updated{' '}
                 <span className='font-medium tabular-nums text-gray-300'>
-                  {ktcLastUpdated ? formatApiInstant(ktcLastUpdated) : '—'}
+                  {formatApiInstant(ktcLastUpdated)}
                 </span>
               </p>
-            )}
+            )} */}
           </div>
         </div>
       </header>
 
-      {/* ── Main content ── */}
       <div className='flex-1'>
         {loading ? (
           <div className='flex flex-col justify-center items-center h-[50vh] gap-3'>
@@ -489,13 +245,12 @@ const DynastyDashboardV2: React.FC = () => {
             <div className='bg-background-paper justify-center rounded-lg'>
               {standingsHeading}
               {researchMetaBanner()}
-              {renderTeamList(teamsData, false)}
+              {renderTeamList()}
             </div>
           </div>
         )}
       </div>
 
-      {/* ── Footer ── */}
       <div className='py-3 px-2 mt-auto bg-background-paper/70 text-center'>
         <div className='text-sm text-gray-400'>
           Sleeper Dynasty League Dashboard
@@ -506,4 +261,4 @@ const DynastyDashboardV2: React.FC = () => {
   );
 };
 
-export default DynastyDashboardV2;
+export default Dashboard;
