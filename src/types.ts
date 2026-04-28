@@ -52,6 +52,12 @@ export interface KTCData {
 // ============================================================================
 // Player Types
 // ============================================================================
+export interface PlayerStats {
+    average_points?: number;
+    total_points?: number;
+    games_played?: number;
+}
+
 export interface Player {
     player_id?: string;
     sleeper_player_id?: string;
@@ -62,10 +68,10 @@ export interface Player {
     position?: string;
     fantasy_positions?: string[];
     age?: number;
+    /** ISO date (YYYY-MM-DD) from Sleeper. */
     birth_date?: string;
+    /** Sleeper height string, e.g. `6'5"`. */
     height?: string;
-    heightFeet?: number;
-    heightInches?: number;
     weight?: string;
     college?: string;
     years_exp?: number;
@@ -74,6 +80,8 @@ export interface Player {
     status?: string;
     injury_status?: string | null;
     ktc?: KTCData;
+    /** Aggregated season stats from SleeperWeeklyData (avg/total/games). */
+    stats?: PlayerStats;
     owned?: number;
     started?: number;
 }
@@ -93,7 +101,6 @@ export interface RosterSettings {
     ppts_decimal?: number;
     waiver_position?: number;
     waiver_budget_used?: number;
-    total_moves?: number;
     rank?: number;
 }
 
@@ -147,6 +154,13 @@ export interface DashboardLeagueBundle {
     researchMeta?: ResearchMeta | null;
     /** ISO timestamp when roster-scoped KTC rows were last written (server UTC). */
     ktcLastUpdated?: string | null;
+}
+
+/** IndexedDB row for `bundle_cache` (offline / stale-while-revalidate). */
+export interface BundleCacheRow {
+    key: string;
+    savedAt: number;
+    data: DashboardLeagueBundle;
 }
 
 // ============================================================================
@@ -264,7 +278,7 @@ export interface PlayerDBSchema extends DBSchema {
     };
     metadata: {
         key: string;
-        value: { lastUpdated: number; key: string; version: string };
+        value: { lastUpdated: number; key: string };
     };
     ownership: {
         key: string;
@@ -273,6 +287,10 @@ export interface PlayerDBSchema extends DBSchema {
     app_prefs: {
         key: string;
         value: AppPrefLeagueId;
+    };
+    bundle_cache: {
+        key: string;
+        value: BundleCacheRow;
     };
 }
 
@@ -291,6 +309,7 @@ export interface LeagueContextType {
     championUserId: string | null;
     teamsData: TeamData[];
     loading: boolean;
+    /** True while a KTC refresh is in progress (dashboard stays visible). */
     refreshing: boolean;
     error: string | null;
     /** True after IndexedDB league preference has been read. */
@@ -299,6 +318,6 @@ export interface LeagueContextType {
     setSelectedLeagueId: (id: string) => void;
     /** Remove stored league id and return to the entry screen. */
     clearStoredLeague: () => void;
-    /** Re-fetches the dashboard bundle; only KTC values are merged into existing players. */
-    refreshData: () => Promise<void>;
+    /** POST a fresh KTC scrape, then reload the dashboard bundle. */
+    refreshData: () => void;
 }

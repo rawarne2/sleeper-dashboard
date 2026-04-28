@@ -1,6 +1,5 @@
 import { IDBPDatabase, IDBPTransaction } from 'idb';
-import { Player, KTCData, PlayerDBSchema } from './types';
-import { API_URLS } from './apiConfig';
+import { Player, KTCData, PlayerDBSchema, PlayerStats } from './types';
 
 interface BackendPlayer {
     sleeper_player_id?: string;
@@ -17,13 +16,11 @@ interface BackendPlayer {
     depth_chart_position?: number;
     status?: string;
     injury_status?: string | null;
-    ktc?: KTCData & { heightFeet?: number; heightInches?: number; age?: number };
+    ktc?: KTCData & { age?: number };
+    stats?: PlayerStats;
 }
 
-const BATCH_SIZE = 500;
-const PLAYER_DATA_VERSION = '1.0';
 const RELEVANT_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K']);
-/** Exclude only clearly non-rosterable players. */
 const EXCLUDED_PLAYER_STATUS = new Set(['retired']);
 
 export function mapBackendPlayerRow(player: BackendPlayer): Player | null {
@@ -41,8 +38,6 @@ export function mapBackendPlayerRow(player: BackendPlayer): Player | null {
         age: player.ktc?.age,
         birth_date: player.birth_date,
         height: player.height,
-        heightFeet: player.ktc?.heightFeet,
-        heightInches: player.ktc?.heightInches,
         weight: player.weight,
         years_exp: player.years_exp,
         college: player.college,
@@ -52,6 +47,7 @@ export function mapBackendPlayerRow(player: BackendPlayer): Player | null {
         number: player.number,
         depth_chart_position: player.depth_chart_position,
         ktc: player.ktc,
+        stats: player.stats,
     };
 }
 
@@ -59,7 +55,7 @@ export function mapBackendPlayersArrayToRecord(
     playersArray: BackendPlayer[]
 ): Record<string, Player> {
     const playersRecord: Record<string, Player> = {};
-    playersArray.forEach((player: BackendPlayer) => {
+    playersArray.forEach((player) => {
         try {
             const mapped = mapBackendPlayerRow(player);
             if (mapped?.player_id) {
@@ -75,7 +71,7 @@ export function mapBackendPlayersArrayToRecord(
     return playersRecord;
 }
 
-/** Normalizes `data.players` from the dashboard bundle (array or id→row record). */
+/** Normalizes `data.players` from the dashboard bundle (array or id-keyed record). */
 export function playersFromDashboardBundle(raw: unknown): Record<string, Player> {
     if (raw == null) {
         return {};
@@ -91,51 +87,21 @@ export function playersFromDashboardBundle(raw: unknown): Record<string, Player>
     return {};
 }
 
-export const fetchPlayers = async (): Promise<Record<string, Player>> => {
-    try {
-        const response = await fetch(API_URLS.KTC_RANKINGS_SUPERFLEX);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch players: ${response.status} ${response.statusText}`);
-        }
-
-        const apiResponse = await response.json();
-        if (!apiResponse?.players || !Array.isArray(apiResponse.players)) {
-            throw new Error('Invalid player data format from backend');
-        }
-
-        return mapBackendPlayersArrayToRecord(apiResponse.players);
-    } catch (err) {
-        console.error('Error fetching players:', err);
-        throw err;
-    }
-};
-
-function isValidHeight(height: string): boolean {
-    const heightRegex = /^\d+'\d+"$/;
-    return heightRegex.test(height);
-}
-
 export async function storePlayer(
     tx: IDBPTransaction<PlayerDBSchema, ['players'], 'readwrite'>,
     player: Player
 ): Promise<IDBValidKey | undefined> {
     if (!player.player_id) {
-        return Promise.resolve(undefined);
+        return undefined;
     }
-
-    if (player.height && !isValidHeight(player.height)) {
-        player.height = undefined;
-    }
-
     const st = (player.status || '').trim().toLowerCase();
     if (st && EXCLUDED_PLAYER_STATUS.has(st)) {
-        return Promise.resolve(undefined);
+        return undefined;
     }
     if (player.position && RELEVANT_POSITIONS.has(player.position)) {
         return tx.store.put(player);
     }
-
-    return Promise.resolve(undefined);
+    return undefined;
 }
 
 export const storePlayers = async (
@@ -146,42 +112,21 @@ export const storePlayers = async (
         const playerIds = Object.keys(playersData);
 
         const tx = db.transaction('players', 'readwrite');
-
-        for (let i = 0; i < playerIds.length; i += BATCH_SIZE) {
-            const batch = playerIds.slice(i, i + BATCH_SIZE);
-            await Promise.all(
-                batch.map(id => {
-                    const player = { ...playersData[id] };
-                    player.player_id = id;
-                    return storePlayer(tx, player);
-                })
-            );
-        }
-
+        await Promise.all(
+            playerIds.map((id) => {
+                const player = { ...playersData[id] };
+                player.player_id = id;
+                return storePlayer(tx, player);
+            })
+        );
         await tx.done;
 
         await db.put('metadata', {
             lastUpdated: Date.now(),
             key: 'lastUpdate',
-            version: PLAYER_DATA_VERSION
         });
     } catch (err) {
         console.error('Error storing players:', err);
-        throw err;
-    }
-};
-
-// Deprecated
-export const fetchAndStorePlayers = async (
-    db: IDBPDatabase<PlayerDBSchema>
-): Promise<Record<string, Player>> => {
-    try {
-        const playersData = await fetchPlayers();
-        await storePlayers(db, playersData);
-
-        return playersData;
-    } catch (err) {
-        console.error('Error in fetchAndStorePlayers:', err);
         throw err;
     }
 };
