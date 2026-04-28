@@ -3,6 +3,7 @@ import React, {
   useEffect,
   useMemo,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react';
 import { openDB, IDBPDatabase } from 'idb';
@@ -19,12 +20,17 @@ import {
   DashboardLeagueBundle,
 } from './types';
 import { storePlayers, playersFromDashboardBundle } from './playerFunctions';
-import { API_CONFIG, buildApiUrl, EXAMPLE_LEAGUES } from './apiConfig';
+import { API_CONFIG, buildApiUrl } from './apiConfig';
 import { LeagueContext } from './leagueContextValue';
+import {
+  dashboardBundleCacheKey,
+  readCachedDashboardBundle,
+  resolveDashboardSeasonParam,
+  writeCachedDashboardBundle,
+} from './dashboardBundleCache';
 
-const { BATCH_SIZE } = API_CONFIG;
 const DB_NAME = 'sleeper-players-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 interface LeagueProviderProps {
   children: ReactNode;
@@ -44,6 +50,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const [error, setError] = useState<string | null>(null);
   const [leagueIdReady, setLeagueIdReady] = useState(false);
   const [selectedLeagueId, setSelectedLeagueIdState] = useState('');
+  const selectedLeagueIdRef = useRef(selectedLeagueId);
+  selectedLeagueIdRef.current = selectedLeagueId;
 
   const initDB = useCallback(async () => {
     return openDB<PlayerDBSchema>(DB_NAME, DB_VERSION, {
@@ -55,6 +63,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         }
         if (oldVersion < 2) {
           db.createObjectStore('app_prefs', { keyPath: 'key' });
+        }
+        if (oldVersion < 3) {
+          db.createObjectStore('bundle_cache', { keyPath: 'key' });
         }
       },
     });
@@ -126,30 +137,24 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       const playerIds = Object.keys(ownership);
       if (playerIds.length === 0) return;
       const tx = db.transaction('ownership', 'readwrite');
-      for (let i = 0; i < playerIds.length; i += BATCH_SIZE) {
-        const batch = playerIds.slice(i, i + BATCH_SIZE);
-        await Promise.all(
-          batch.map((id) => {
-            const ownershipData = ownership[id];
-            return tx.store.put({
-              key: `${season}_${id}`,
-              player_id: id,
-              owned: ownershipData.owned,
-              started: ownershipData.started,
-            });
-          })
-        );
-      }
+      await Promise.all(
+        playerIds.map((id) => {
+          const ownershipData = ownership[id];
+          return tx.store.put({
+            key: `${season}_${id}`,
+            player_id: id,
+            owned: ownershipData.owned,
+            started: ownershipData.started,
+          });
+        })
+      );
       await tx.done;
     },
     []
   );
 
   const fetchBundle = useCallback(async () => {
-    const example = EXAMPLE_LEAGUES.find((l) => l.id === selectedLeagueId);
-    const seasonParam = String(
-      example?.season ?? new Date().getFullYear()
-    );
+    const seasonParam = resolveDashboardSeasonParam(selectedLeagueId);
 
     const bundleUrl = buildApiUrl(
       API_CONFIG.ENDPOINTS.DASHBOARD_LEAGUE(selectedLeagueId),
@@ -207,19 +212,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     return { data, playersMap };
   }, [selectedLeagueId]);
 
-  const loadFullData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const db = await initDB();
-      const { data, playersMap } = await fetchBundle();
-
-      await storePlayers(db, playersMap);
-      const seasonNum = parseInt(data.league?.season ?? '', 10);
-      if (!Number.isNaN(seasonNum)) {
-        await persistOwnershipSeason(db, seasonNum, data.ownership);
-      }
-
+  const applyDashboardBundle = useCallback(
+    (data: DashboardLeagueBundle, playersMap: Record<string, Player>) => {
       setRosters(data.rosters);
       setUsers(data.users);
       setLeague(data.league ?? null);
@@ -227,13 +221,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       setKtcLastUpdated(data.ktcLastUpdated ?? null);
       setPlayers(playersMap);
       setPlayerOwnership(data.ownership);
-    } catch (err) {
-      console.error('Error loading data:', err);
-      setError(`Failed to load league data. Please try again later. ${err}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [initDB, fetchBundle, persistOwnershipSeason]);
+    },
+    []
+  );
 
   const refreshData = useCallback(async () => {
     setRefreshing(true);
@@ -277,6 +267,81 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     }
   }, [initDB, fetchBundle, persistOwnershipSeason]);
 
+  const loadFullData = useCallback(async () => {
+    const forLeagueId = selectedLeagueId;
+    const cacheKey = dashboardBundleCacheKey(forLeagueId);
+
+    setLoading(true);
+    setError(null);
+    let paintedFromCache = false;
+
+    const dbPromise = initDB();
+    const bundlePromise = fetchBundle();
+
+    try {
+      const db = await dbPromise;
+      if (selectedLeagueIdRef.current !== forLeagueId) return;
+
+      const cached = await readCachedDashboardBundle(db, cacheKey);
+      if (selectedLeagueIdRef.current !== forLeagueId) return;
+
+      if (cached) {
+        const cachedPlayers = playersFromDashboardBundle(cached.players);
+        applyDashboardBundle(cached, cachedPlayers);
+        paintedFromCache = true;
+        setLoading(false);
+      }
+
+      const { data, playersMap } = await bundlePromise;
+      if (selectedLeagueIdRef.current !== forLeagueId) return;
+
+      applyDashboardBundle(data, playersMap);
+      setError(null);
+
+      // Persist to IndexedDB after paint so UI isn't blocked
+      const seasonNum = parseInt(data.league?.season ?? '', 10);
+      queueMicrotask(() => {
+        const ownershipPersist =
+          !Number.isNaN(seasonNum)
+            ? persistOwnershipSeason(db, seasonNum, data.ownership)
+            : Promise.resolve();
+        Promise.all([
+          storePlayers(db, playersMap),
+          ownershipPersist,
+          writeCachedDashboardBundle(db, cacheKey, data),
+        ]).catch((e) => console.warn('IndexedDB persist failed', e));
+      });
+    } catch (err) {
+      console.error('Error loading data:', err);
+      if (!paintedFromCache) {
+        setError(`Failed to load league data. Please try again later. ${err}`);
+      } else {
+        console.warn('Dashboard revalidate failed; showing cached data.', err);
+      }
+    } finally {
+      if (
+        selectedLeagueIdRef.current === forLeagueId &&
+        !paintedFromCache
+      ) {
+        setLoading(false);
+      }
+    }
+  }, [
+    selectedLeagueId,
+    initDB,
+    fetchBundle,
+    persistOwnershipSeason,
+    applyDashboardBundle,
+  ]);
+
+  const usersById = useMemo(() => {
+    const m = new Map<string, User>();
+    for (const u of users) {
+      m.set(u.user_id, u);
+    }
+    return m;
+  }, [users]);
+
   const teamsData = useMemo((): TeamData[] => {
     if (
       rosters.length === 0 ||
@@ -288,7 +353,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
     return rosters
       .map((roster) => {
-        const user = users.find((u) => u.user_id === roster.owner_id) || {
+        const user = usersById.get(roster.owner_id) ?? {
           user_id: roster.owner_id,
           username: 'Unknown User',
           display_name: 'Unknown',
@@ -332,7 +397,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           (b.roster.settings.fpts_decimal || 0) / 100;
         return bPoints - aPoints;
       });
-  }, [rosters, users, players]);
+  }, [rosters, users, usersById, players]);
 
   const championUserId = useMemo((): string | null => {
     if (!league || league.status !== 'complete') return null;
