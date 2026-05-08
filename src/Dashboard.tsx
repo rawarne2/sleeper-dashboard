@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { useLeague } from './useLeague';
 import { getLeagueStatusInfo } from './utils/teamStats';
@@ -6,6 +6,21 @@ import { getLeagueStatusInfo } from './utils/teamStats';
 import { TeamPanel } from './components/TeamPanel';
 import { LeaguePickerCard } from './components/LeaguePickerCard';
 import { LegendModal } from './components/LegendModal';
+import { TradeAnalyzerPage } from './pages/TradeAnalyzerPage';
+
+type DashboardTab = 'standings' | 'trade-analyzer';
+
+function normalizeDashboardHash(hash: string): DashboardTab {
+  const cleaned = (hash || '').trim().replace(/^#/, '').toLowerCase();
+  if (cleaned === 'trade-analyzer') return 'trade-analyzer';
+  return 'standings';
+}
+
+function setDashboardHash(tab: DashboardTab) {
+  const next = `#${tab}`;
+  if (window.location.hash === next) return;
+  window.location.hash = next;
+}
 
 const Dashboard: React.FC = () => {
   const {
@@ -29,6 +44,64 @@ const Dashboard: React.FC = () => {
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   const [leaguePickerOpen, setLeaguePickerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
+    typeof window === 'undefined'
+      ? 'standings'
+      : normalizeDashboardHash(window.location.hash)
+  );
+
+  useEffect(() => {
+    const onHashChange = () => {
+      setActiveTab(normalizeDashboardHash(window.location.hash));
+    };
+    window.addEventListener('hashchange', onHashChange);
+    onHashChange();
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  useEffect(() => {
+    const normalized = normalizeDashboardHash(window.location.hash);
+    if (normalized !== activeTab) {
+      setDashboardHash(activeTab);
+    }
+  }, [activeTab]);
+
+  const baseBtn =
+    'inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs sm:text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main';
+  const tabActive = 'bg-white/10 text-white border border-white/15 shadow-sm';
+  const tabInactive =
+    'bg-transparent text-gray-300 border border-white/10 hover:bg-white/5 hover:text-white';
+
+  const tabBar = (
+    <div className='sticky top-0 z-50 border-b border-white/10 bg-[#0d1e2e]'>
+      <div className='mx-auto w-full max-w-xl px-3 py-2 sm:max-w-2xl sm:px-5 md:max-w-4xl md:px-6 lg:max-w-5xl'>
+        <div className='flex w-full items-center justify-center'>
+          <div className='flex w-full max-w-md rounded-xl border border-white/10 bg-black/10 p-1'>
+            <button
+              type='button'
+              className={`${baseBtn} flex-1 ${
+                activeTab === 'standings' ? tabActive : tabInactive
+              }`}
+              onClick={() => setActiveTab('standings')}
+              aria-current={activeTab === 'standings' ? 'page' : undefined}
+            >
+              League Standings
+            </button>
+            <button
+              type='button'
+              className={`${baseBtn} flex-1 ${
+                activeTab === 'trade-analyzer' ? tabActive : tabInactive
+              }`}
+              onClick={() => setActiveTab('trade-analyzer')}
+              aria-current={activeTab === 'trade-analyzer' ? 'page' : undefined}
+            >
+              Trade Analyzer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const handleTeamClick = (rosterId: number) => {
     setExpandedTeam(expandedTeam === rosterId ? null : rosterId);
@@ -234,6 +307,8 @@ const Dashboard: React.FC = () => {
         </div>
       </header>
 
+      {tabBar}
+
       <div className='flex-1'>
         {loading ? (
           <div className='flex flex-col justify-center items-center h-[50vh] gap-3'>
@@ -242,11 +317,17 @@ const Dashboard: React.FC = () => {
           </div>
         ) : (
           <div className='grid grid-cols-1 gap-4'>
-            <div className='bg-background-paper justify-center rounded-lg'>
-              {standingsHeading}
-              {researchMetaBanner()}
-              {renderTeamList()}
-            </div>
+            {activeTab === 'standings' ? (
+              <div className='bg-background-paper justify-center rounded-lg'>
+                {standingsHeading}
+                {researchMetaBanner()}
+                {renderTeamList()}
+              </div>
+            ) : (
+              <div className='bg-background-paper justify-center rounded-lg'>
+                <TradeAnalyzerPage />
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -18,6 +18,7 @@ import {
   LeagueContextType,
   PlayerDBSchema,
   DashboardLeagueBundle,
+  TradeAnalyzerPick,
 } from './types';
 import { storePlayers, playersFromDashboardBundle } from './playerFunctions';
 import { API_CONFIG, buildApiUrl } from './apiConfig';
@@ -26,6 +27,7 @@ import {
   dashboardBundleCacheKey,
   readCachedDashboardBundle,
   resolveDashboardSeasonParam,
+  tradePicksByRosterFromBundle,
   writeCachedDashboardBundle,
 } from './dashboardBundleCache';
 
@@ -42,6 +44,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const [players, setPlayers] = useState<Record<string, Player>>({});
   const [playerOwnership, setPlayerOwnership] = useState<PlayerOwnershipData>({});
   const [league, setLeague] = useState<League | null>(null);
+  const [tradePicksByRoster, setTradePicksByRoster] = useState<
+    Map<number, TradeAnalyzerPick[]>
+  >(() => new Map());
   const [researchMeta, setResearchMeta] = useState<ResearchMeta | null>(null);
   const [ktcLastUpdated, setKtcLastUpdated] = useState<string | null>(null);
 
@@ -78,7 +83,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         const db = await initDB();
         const row = await db.get('app_prefs', 'league_id');
         if (!cancelled) {
-          setSelectedLeagueIdState((row?.leagueId ?? '').trim());
+          const id =
+            row && row.key === 'league_id' ? (row.leagueId ?? '').trim() : '';
+          setSelectedLeagueIdState(id);
           setLeagueIdReady(true);
         }
       } catch (e) {
@@ -95,6 +102,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     if (!leagueIdReady) return;
     if (!selectedLeagueId) {
       setLoading(false);
+      setTradePicksByRoster(new Map());
       return;
     }
     void (async () => {
@@ -221,6 +229,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       setKtcLastUpdated(data.ktcLastUpdated ?? null);
       setPlayers(playersMap);
       setPlayerOwnership(data.ownership);
+      setTradePicksByRoster(tradePicksByRosterFromBundle(data));
     },
     []
   );
@@ -259,6 +268,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       setKtcLastUpdated(data.ktcLastUpdated ?? null);
       setPlayers(playersMap);
       setPlayerOwnership(data.ownership);
+      setTradePicksByRoster(tradePicksByRosterFromBundle(data));
     } catch (err) {
       console.error('Error refreshing KTC data:', err);
       setError(`Failed to refresh KTC data. ${err}`);
@@ -419,6 +429,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     users,
     players,
     playerOwnership,
+    tradePicksByRoster,
     league,
     researchMeta,
     ktcLastUpdated,

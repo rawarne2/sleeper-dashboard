@@ -1,5 +1,10 @@
 import { EXAMPLE_LEAGUES } from './apiConfig';
-import type { DashboardLeagueBundle, PlayerDBSchema } from './types';
+import type {
+  DashboardLeagueBundle,
+  DashboardPickRow,
+  PlayerDBSchema,
+  TradeAnalyzerPick,
+} from './types';
 import type { IDBPDatabase } from 'idb';
 import { playersFromDashboardBundle } from './playerFunctions';
 
@@ -7,6 +12,61 @@ import { playersFromDashboardBundle } from './playerFunctions';
 export function resolveDashboardSeasonParam(leagueId: string): string {
   const example = EXAMPLE_LEAGUES.find((l) => l.id === leagueId);
   return String(example?.season ?? new Date().getFullYear());
+}
+
+/** Season year for APIs that require it: bundle league first, then example-league row or calendar year. */
+export function resolveTradeAnalyzerSeason(
+  league: { season?: string } | null,
+  leagueId: string
+): number {
+  const fromLeague = parseInt(league?.season ?? '', 10);
+  if (Number.isFinite(fromLeague) && fromLeague > 0) return fromLeague;
+  const fromParam = parseInt(resolveDashboardSeasonParam(leagueId), 10);
+  if (Number.isFinite(fromParam) && fromParam > 0) return fromParam;
+  return new Date().getFullYear();
+}
+
+/** Map roster_id → picks from bundled `picks_by_roster` for the trade analyzer UI. */
+export function tradePicksByRosterFromBundle(
+  bundle: DashboardLeagueBundle
+): Map<number, TradeAnalyzerPick[]> {
+  const m = new Map<number, TradeAnalyzerPick[]>();
+  const raw = bundle.picks_by_roster;
+  if (!raw || typeof raw !== 'object') return m;
+  for (const [ridStr, rows] of Object.entries(raw)) {
+    const rosterId = Number(ridStr);
+    if (!Number.isFinite(rosterId) || !Array.isArray(rows)) continue;
+    const list: TradeAnalyzerPick[] = [];
+    for (const row of rows as DashboardPickRow[]) {
+      if (!row || typeof row !== 'object') continue;
+      const seasonRaw = row.season;
+      const season =
+        typeof seasonRaw === 'number' && Number.isFinite(seasonRaw)
+          ? seasonRaw
+          : parseInt(String(seasonRaw ?? ''), 10) || 0;
+      const round =
+        typeof row.round === 'number' && Number.isFinite(row.round)
+          ? row.round
+          : parseInt(String(row.round), 10) || 0;
+      const slot =
+        typeof row.slot_bucket === 'string' && row.slot_bucket.trim()
+          ? row.slot_bucket
+          : undefined;
+      list.push({
+        pick_id: row.pick_id,
+        owner_roster_id: rosterId,
+        season,
+        round,
+        descriptor: slot as TradeAnalyzerPick['descriptor'],
+        ktc_value:
+          typeof row.ktc_value === 'number' && Number.isFinite(row.ktc_value)
+            ? row.ktc_value
+            : undefined,
+      });
+    }
+    m.set(rosterId, list);
+  }
+  return m;
 }
 
 export function dashboardBundleCacheKey(leagueId: string): string {

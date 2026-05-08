@@ -13,6 +13,107 @@ export interface ApiResponse<T = unknown> {
 }
 
 // ============================================================================
+// Trade Analyzer Types
+// ============================================================================
+export interface ProviderHealth {
+    provider: string;
+    healthy: boolean;
+    models?: string[];
+    message?: string;
+}
+
+export type TradeSide = 'a' | 'b';
+
+/** Row from dashboard bundle `picks_by_roster` (matches backend OwnedPick + ktc_value). */
+export interface DashboardPickRow {
+    pick_id: string;
+    season: string | number;
+    round: number;
+    original_roster_id: number;
+    slot_bucket: string;
+    ktc_value?: number | null;
+}
+
+export interface TradeAnalyzerPick {
+    pick_id?: string;
+    owner_roster_id: number;
+    season: number;
+    round: number;
+    descriptor?: 'early' | 'mid' | 'late' | string;
+    ktc_value?: number;
+}
+
+/** POST /api/trade-analyzer/analyze body (see `routes/trade_analyzer/request_schema.py`). */
+export interface TradeAnalyzerKtcConfig {
+    league_format: '1qb' | 'superflex';
+    is_redraft: boolean;
+    tep_level: '' | 'tep' | 'tepp' | 'teppp' | null;
+}
+
+export interface TradeAnalyzerRequest {
+    league_id: string;
+    /** Four-digit year string (backend validates with `season.isdigit()` and length 4). */
+    season: string;
+    side_a: {
+        roster_id: number;
+        player_ids: string[];
+        pick_ids: string[];
+    };
+    side_b: {
+        roster_id: number;
+        player_ids: string[];
+        pick_ids: string[];
+    };
+    ktc?: TradeAnalyzerKtcConfig | null;
+    additional_context?: string | null;
+    provider?: string | null;
+    model?: string | null;
+}
+
+export interface TradeAnalyzerResponse {
+    fairness_score: number; // 0-100
+    winner: TradeSide | 'even';
+    summary_bullets: string[];
+    side_a: {
+        pros: string[];
+        cons: string[];
+        ktc_delta: {
+            values_in: number;
+            values_out: number;
+            net: number;
+            per_asset: Array<{
+                label: string;
+                value: number;
+            }>;
+        };
+        sleeper_data: {
+            stats_trajectory: Array<{ x: string; y: number }>;
+            positional_impact: string;
+            needs_addressed: string[];
+        };
+    };
+    side_b: TradeAnalyzerResponse['side_a'];
+}
+
+export interface TradeAnalyzerRateLimitError {
+    error: string;
+    retry_after_seconds: number;
+}
+
+export interface TradeAnalyzerPrefsRow {
+    key: 'trade_analyzer_prefs';
+    provider: string | null;
+    model: string | null;
+}
+
+export interface TradeAnalyzerLastResultRow {
+    key: 'trade_analyzer_last_result';
+    createdAt: number;
+    request: TradeAnalyzerRequest;
+    response: TradeAnalyzerResponse;
+}
+
+// ============================================================================
 // KTC Value Types
 // ============================================================================
 export interface KTCValues {
@@ -154,6 +255,8 @@ export interface DashboardLeagueBundle {
     researchMeta?: ResearchMeta | null;
     /** ISO timestamp when roster-scoped KTC rows were last written (server UTC). */
     ktcLastUpdated?: string | null;
+    /** Owned draft picks per roster_id (from `compute_owned_picks`). */
+    picks_by_roster?: Record<string, DashboardPickRow[]>;
 }
 
 /** IndexedDB row for `bundle_cache` (offline / stale-while-revalidate). */
@@ -271,6 +374,11 @@ export interface AppPrefLeagueId {
     leagueId: string;
 }
 
+export type AppPrefRow =
+    | AppPrefLeagueId
+    | TradeAnalyzerPrefsRow
+    | TradeAnalyzerLastResultRow;
+
 export interface PlayerDBSchema extends DBSchema {
     players: {
         key: string;
@@ -286,7 +394,7 @@ export interface PlayerDBSchema extends DBSchema {
     };
     app_prefs: {
         key: string;
-        value: AppPrefLeagueId;
+        value: AppPrefRow;
     };
     bundle_cache: {
         key: string;
@@ -302,6 +410,8 @@ export interface LeagueContextType {
     users: User[];
     players: Record<string, Player>;
     playerOwnership: PlayerOwnershipData;
+    /** Draft picks for the loaded league (from dashboard bundle `picks_by_roster`). */
+    tradePicksByRoster: Map<number, TradeAnalyzerPick[]>;
     league: League | null;
     researchMeta: ResearchMeta | null;
     /** ISO string from bundle `ktcLastUpdated`; null if unknown or no KTC rows. */
