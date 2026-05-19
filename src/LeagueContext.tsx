@@ -122,6 +122,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     setUsers([]);
     setPlayers({});
     setPlayerOwnership({});
+    setTradePicksByRoster(new Map());
     setLeague(null);
     setResearchMeta(null);
     setKtcLastUpdated(null);
@@ -281,6 +282,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     const forLeagueId = selectedLeagueId;
     const cacheKey = dashboardBundleCacheKey(forLeagueId);
 
+    setTradePicksByRoster(new Map());
     setLoading(true);
     setError(null);
     let paintedFromCache = false;

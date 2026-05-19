@@ -168,6 +168,7 @@ interface ProvidersRootResponse {
   providers?: Array<{
     name: string;
     default_model?: string;
+    models?: string[];
     available: boolean;
     detail?: string;
   }>;
@@ -226,12 +227,23 @@ function mapProviderRows(
   rows: NonNullable<ProvidersRootResponse['providers']> | undefined
 ): ProviderHealth[] {
   if (!rows) return [];
-  return rows.map((p) => ({
-    provider: p.name,
-    healthy: Boolean(p.available),
-    models: p.default_model ? [p.default_model] : [],
-    message: typeof p.detail === 'string' ? p.detail : undefined,
-  }));
+  return rows.map((p) => {
+    const fromApi = Array.isArray(p.models)
+      ? p.models.filter((m): m is string => typeof m === 'string' && !!m.trim())
+      : [];
+    const models =
+      fromApi.length > 0
+        ? fromApi
+        : p.default_model?.trim()
+          ? [p.default_model.trim()]
+          : [];
+    return {
+      provider: p.name,
+      healthy: Boolean(p.available),
+      models,
+      message: typeof p.detail === 'string' ? p.detail : undefined,
+    };
+  });
 }
 
 /** Full providers response including dev vs prod model-selection policy. */

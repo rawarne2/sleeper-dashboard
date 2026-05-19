@@ -52,9 +52,22 @@ export function tradePicksByRosterFromBundle(
         typeof row.slot_bucket === 'string' && row.slot_bucket.trim()
           ? row.slot_bucket
           : undefined;
+      const pickId =
+        typeof row.pick_id === 'string' && row.pick_id.trim()
+          ? row.pick_id.trim()
+          : undefined;
+      if (!pickId) continue;
+
+      const originalRosterId =
+        typeof row.original_roster_id === 'number' &&
+        Number.isFinite(row.original_roster_id)
+          ? row.original_roster_id
+          : undefined;
+
       list.push({
-        pick_id: row.pick_id,
+        pick_id: pickId,
         owner_roster_id: rosterId,
+        original_roster_id: originalRosterId,
         season,
         round,
         descriptor: slot as TradeAnalyzerPick['descriptor'],

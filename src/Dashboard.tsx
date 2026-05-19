@@ -8,6 +8,9 @@ import { LeaguePickerCard } from './components/LeaguePickerCard';
 import { LegendModal } from './components/LegendModal';
 import { TradeAnalyzerPage } from './pages/TradeAnalyzerPage';
 
+/** Horizontal padding shared by header and tab bar. */
+const dashboardShell = 'w-full px-3 sm:px-5 md:px-6';
+
 type DashboardTab = 'standings' | 'trade-analyzer';
 
 function normalizeDashboardHash(hash: string): DashboardTab {
@@ -67,33 +70,40 @@ const Dashboard: React.FC = () => {
   }, [activeTab]);
 
   const baseBtn =
-    'inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs sm:text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main';
-  const tabActive = 'bg-white/10 text-white border border-white/15 shadow-sm';
+    'inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs sm:text-sm font-semibold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main';
+  const tabActive =
+    'bg-primary-main text-white shadow-md ring-2 ring-primary-main/50 scale-[1.02] z-10';
   const tabInactive =
-    'bg-transparent text-gray-300 border border-white/10 hover:bg-white/5 hover:text-white';
+    'bg-[#0b1624] text-gray-400 hover:bg-white/8 hover:text-gray-200';
 
   const tabBar = (
     <div className='sticky top-0 z-50 border-b border-white/10 bg-[#0d1e2e]'>
-      <div className='mx-auto w-full max-w-xl px-3 py-2 sm:max-w-2xl sm:px-5 md:max-w-4xl md:px-6 lg:max-w-5xl'>
+      <div className={`${dashboardShell} py-2`}>
         <div className='flex w-full items-center justify-center'>
-          <div className='flex w-full max-w-md rounded-xl border border-white/10 bg-black/10 p-1'>
+          <div
+            className='flex w-full max-w-md gap-1.5 rounded-xl border border-white/10 bg-black/20 p-1.5'
+            role='tablist'
+            aria-label='Dashboard views'
+          >
             <button
               type='button'
+              role='tab'
+              aria-selected={activeTab === 'standings'}
               className={`${baseBtn} flex-1 ${
                 activeTab === 'standings' ? tabActive : tabInactive
               }`}
               onClick={() => setActiveTab('standings')}
-              aria-current={activeTab === 'standings' ? 'page' : undefined}
             >
               League Standings
             </button>
             <button
               type='button'
+              role='tab'
+              aria-selected={activeTab === 'trade-analyzer'}
               className={`${baseBtn} flex-1 ${
                 activeTab === 'trade-analyzer' ? tabActive : tabInactive
               }`}
               onClick={() => setActiveTab('trade-analyzer')}
-              aria-current={activeTab === 'trade-analyzer' ? 'page' : undefined}
             >
               Trade Analyzer
             </button>
@@ -224,51 +234,49 @@ const Dashboard: React.FC = () => {
       ) : null}
 
       <header className='border-b border-white/10 bg-[#0d1e2e]'>
-        <div className='mx-auto flex w-full max-w-xl flex-col gap-3 px-3 py-4 sm:max-w-2xl sm:gap-4 sm:px-5 sm:py-5 md:max-w-4xl md:px-6 lg:max-w-5xl'>
-          <div className='flex flex-col items-center text-center'>
-            <div className='min-w-0 max-w-full space-y-2 sm:max-w-[min(100%,28rem)] md:max-w-[min(100%,36rem)]'>
-              <h1 className='text-xs font-semibold leading-snug tracking-tight text-white sm:text-sm'>
-                Sleeper Dynasty Dashboard
-              </h1>
-              <div className='space-y-1'>
-                {league?.name ? (
-                  <div
-                    className='text-balance text-base font-semibold text-gray-100 sm:text-lg'
-                    title={league.name}
-                  >
-                    <span className='text-gray-300 font-normal'>League:</span> {league.name}
-                  </div>
-                ) : null}
-                <div className='font-mono text-xs tabular-nums text-gray-400 sm:text-sm'>
-                  ID {selectedLeagueId}
-                </div>
-              </div>
-              <div className='flex flex-wrap items-center justify-center gap-2'>
+        <div className={`${dashboardShell} flex flex-col gap-2 py-2.5 sm:py-3`}>
+          <h1 className='text-center text-xs font-semibold tracking-tight text-gray-300 sm:text-sm'>
+            Sleeper Dynasty Dashboard
+          </h1>
+
+          <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+            <div className='min-w-0 flex-1 text-center sm:text-left'>
+              {league?.name ? (
+                <p
+                  className='truncate text-sm font-semibold text-gray-100 sm:text-base'
+                  title={league.name}
+                >
+                  {league.name}
+                </p>
+              ) : null}
+              <p className='mt-0.5 font-mono text-[10px] tabular-nums text-gray-400 sm:text-xs'>
+                ID {selectedLeagueId}
+              </p>
+              <div className='mt-1.5 flex flex-wrap items-center justify-center gap-1.5 sm:justify-start'>
                 {leagueStatus && (
                   <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium sm:text-sm ${leagueStatus.className}`}
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium sm:text-xs ${leagueStatus.className}`}
                   >
                     {leagueStatus.label}
                   </span>
                 )}
                 {league?.season && (
-                  <span className='inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-gray-300 sm:text-sm'>
-                    {league.season} season
+                  <span className='inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-gray-400 sm:text-xs'>
+                    {league.season}
                   </span>
                 )}
                 {league?.total_rosters != null && (
-                  <span className='inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-gray-300 sm:text-sm'>
+                  <span className='inline-flex items-center rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-medium text-gray-400 sm:text-xs'>
                     {league.total_rosters} teams
                   </span>
                 )}
               </div>
             </div>
-          </div>
 
-          <div className='flex flex-col items-center gap-3 border-t border-white/10 pt-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-2 sm:gap-y-2 md:gap-x-3'>
+            <div className='flex shrink-0 items-center justify-center gap-2'>
             <button
               type='button'
-              className='inline-flex w-full max-w-sm items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white sm:w-auto sm:max-w-none sm:text-sm'
+              className='inline-flex items-center justify-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white sm:text-sm'
               onClick={() => setLegendOpen(true)}
               aria-label='Open legend'
             >
@@ -277,32 +285,12 @@ const Dashboard: React.FC = () => {
             </button>
             <button
               type='button'
-              className='inline-flex w-full max-w-sm items-center justify-center rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white sm:w-auto sm:max-w-none sm:text-sm'
+              className='inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white sm:text-sm'
               onClick={() => setLeaguePickerOpen(true)}
             >
               Change league
             </button>
-            {/* <button  // !!!!!!!!!!!!!!: only use for development
-              type='button'
-              className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-lg bg-primary-main px-4 py-2.5 text-sm font-semibold text-white shadow-lg ring-1 ring-white/10 transition-[filter,opacity] hover:brightness-110 disabled:pointer-events-none disabled:opacity-45 sm:w-auto sm:max-w-none sm:px-4 sm:py-2'
-              onClick={() => refreshData()}
-              disabled={refreshing || loading}
-              title='Requests a fresh KTC scrape on the server, then reloads this league’s data'
-              aria-label='Refresh KTC Data'
-            >
-              {refreshing && (
-                <span className='inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white' />
-              )}
-              {refreshing ? 'Refreshing…' : 'Refresh KTC Data'}
-            </button> */}
-            {/* {!loading && ktcLastUpdated && (
-              <p className='w-full max-w-sm text-center text-xs leading-snug text-gray-400 sm:max-w-none sm:basis-full sm:text-sm'>
-                KTC last updated{' '}
-                <span className='font-medium tabular-nums text-gray-300'>
-                  {formatApiInstant(ktcLastUpdated)}
-                </span>
-              </p>
-            )} */}
+            </div>
           </div>
         </div>
       </header>
@@ -324,7 +312,7 @@ const Dashboard: React.FC = () => {
                 {renderTeamList()}
               </div>
             ) : (
-              <div className='bg-background-paper justify-center rounded-lg'>
+              <div className='bg-background-paper py-4 sm:py-5'>
                 <TradeAnalyzerPage />
               </div>
             )}

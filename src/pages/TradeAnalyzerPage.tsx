@@ -1,19 +1,20 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   BarChart3Icon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   RefreshCwIcon,
   SettingsIcon,
 } from 'lucide-react';
-import { openDB } from 'idb';
 import { useLeague } from '../useLeague';
 import { resolveTradeAnalyzerSeason } from '../dashboardBundleCache';
 import type {
   Player,
   ProviderHealth,
   TeamData,
+  TradeAnalyzerHistoryEntry,
   TradeAnalyzerPick,
   TradeAnalyzerRequest,
-  TradeAnalyzerResponse,
 } from '../types';
 import {
   analyzeTrade,
@@ -21,6 +22,26 @@ import {
   fetchTradeAnalyzerProviders,
   type TradeAnalyzerError,
 } from '../services/tradeAnalyzer';
+import {
+  buildTradeAnalyzerHistoryEntry,
+  ktcValueForPlayer,
+  loadTradeAnalyzerHistory,
+  loadTradeAnalyzerPrefs,
+  playerDisplayName,
+  playerRankLabel,
+  saveTradeAnalyzerHistory,
+  saveTradeAnalyzerPrefs,
+} from '../services/tradeAnalyzerStorage';
+import {
+  AnalysisResultsPanel,
+  RecentTradeAnalysesSection,
+} from '../components/tradeAnalyzer/TradeAnalyzerResults';
+import {
+  buildModelSelectOptions,
+  toneForSide,
+  tradeValueToneClass,
+  TradeAssetTag,
+} from '../components/tradeAnalyzer/tradeAssetUi';
 
 type SideKey = 'a' | 'b';
 
@@ -41,10 +62,7 @@ type SideState = {
   assets: SelectedAsset[];
 };
 
-type ResultsState =
-  | { status: 'idle' }
-  | { status: 'loading'; startedAt: number }
-  | { status: 'ready'; analyzedAt: number; data: TradeAnalyzerResponse };
+type ResultsState = { status: 'idle' } | { status: 'loading' } | { status: 'ready' };
 
 type State = {
   sideA: SideState;
@@ -66,7 +84,8 @@ type Action =
   | { type: 'setContext'; value: string }
   | { type: 'setActiveSide'; side: SideKey }
   | { type: 'analyzeStart' }
-  | { type: 'analyzeReady'; analyzedAt: number; data: TradeAnalyzerResponse }
+  | { type: 'analyzeReady' }
+  | { type: 'analyzeFailed' }
   | { type: 'setProviders'; providers: ProviderHealth[] }
   | { type: 'setRateLimitUntil'; untilMs: number | null; message: string | null }
   | { type: 'setAnalysisError'; message: string | null }
@@ -153,13 +172,13 @@ function reducer(state: State, action: Action): State {
       return { ...state, activeSide: action.side };
     }
     case 'analyzeStart': {
-      return { ...state, results: { status: 'loading', startedAt: Date.now() } };
+      return { ...state, results: { status: 'loading' } };
     }
     case 'analyzeReady': {
-      return {
-        ...state,
-        results: { status: 'ready', analyzedAt: action.analyzedAt, data: action.data },
-      };
+      return { ...state, results: { status: 'ready' } };
+    }
+    case 'analyzeFailed': {
+      return { ...state, results: { status: 'idle' } };
     }
     case 'setProviders': {
       return { ...state, providers: action.providers };
@@ -236,38 +255,19 @@ function sortPlayersByName(players: Player[]): Player[] {
   );
 }
 
-/**
- * Full border (width + style + color) per position so tags win over global `button { border: … }` in index.css.
- */
-function tradePlayerChipBorder(position?: string): string {
-  const pos = (position || '').trim().toUpperCase();
-  switch (pos) {
-    case 'QB':
-      return 'border-2 border-solid border-red-500';
-    case 'RB':
-      return 'border-2 border-solid border-green-500';
-    case 'WR':
-      return 'border-2 border-solid border-blue-500';
-    case 'TE':
-      return 'border-2 border-solid border-amber-500';
-    case 'K':
-      return 'border-2 border-solid border-purple-500';
-    case 'DEF':
-      return 'border-2 border-solid border-cyan-500';
-    default:
-      return 'border-2 border-solid border-gray-500';
-  }
+/** Production lock: show all providers but only Gemini is selectable. */
+function isProviderUiDisabled(provider: string, allowsClientChoice: boolean): boolean {
+  return !allowsClientChoice && provider.trim().toLowerCase() !== 'gemini';
 }
 
-const TRADE_PLAYER_CHIP =
-  'box-border inline-flex items-center justify-center rounded-full bg-white/5 text-gray-100 text-xs sm:text-sm font-semibold leading-tight shadow-sm transition-[filter] hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main';
-
-const TRADE_PICK_CHIP =
-  'box-border inline-flex min-w-[44px] items-center justify-center rounded-full border-2 border-solid border-amber-400 bg-white/5 text-gray-100 text-xs sm:text-sm font-semibold leading-tight shadow-sm transition-[filter] hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main';
+function providerUiAvailable(p: ProviderHealth, allowsClientChoice: boolean): boolean {
+  return p.healthy && !isProviderUiDisabled(p.provider, allowsClientChoice);
+}
 
 function inferAiRoutingFromProviders(
   providers: ProviderHealth[],
-  defaultProvider?: string
+  defaultProvider?: string,
+  allowsClientChoice = false
 ): {
   serviceLabel: string;
   modelLabel: string;
@@ -275,15 +275,15 @@ function inferAiRoutingFromProviders(
   if (providers.length === 0) {
     return {
       serviceLabel: 'Unknown',
-      modelLabel: 'Could not load AI details. Is the backend running?',
+      modelLabel: 'Could not load AI settings. Is the backend running?',
     };
   }
   const def = defaultProvider?.trim().toLowerCase();
   const primary = def
     ? providers.find((p) => p.provider.toLowerCase() === def) ??
-      providers.find((p) => p.healthy) ??
+      providers.find((p) => providerUiAvailable(p, allowsClientChoice)) ??
       providers[0]
-    : providers.find((p) => p.healthy) ?? providers[0];
+    : providers.find((p) => providerUiAvailable(p, allowsClientChoice)) ?? providers[0];
   const serviceLabel = primary.provider || 'Unknown';
   const models =
     primary.models?.filter((m) => typeof m === 'string' && m.trim().length > 0) ?? [];
@@ -300,18 +300,20 @@ function inferAiRoutingDevChoice(args: {
   defaultProvider: string;
   chosenProvider: string;
   chosenModelDraft: string;
+  allowsClientChoice: boolean;
 }): { serviceLabel: string; modelLabel: string } {
-  const { providers, defaultProvider, chosenProvider, chosenModelDraft } = args;
+  const { providers, defaultProvider, chosenProvider, chosenModelDraft, allowsClientChoice } =
+    args;
   if (providers.length === 0) {
     return {
       serviceLabel: 'Unknown',
-      modelLabel: 'Could not load AI details. Is the backend running?',
+      modelLabel: 'Could not load AI settings. Is the backend running?',
     };
   }
   const key = (chosenProvider.trim().toLowerCase() || defaultProvider.toLowerCase());
   const row =
     providers.find((p) => p.provider.toLowerCase() === key) ??
-    providers.find((p) => p.healthy) ??
+    providers.find((p) => providerUiAvailable(p, allowsClientChoice)) ??
     providers[0];
   const serverHint =
     row.models?.filter((m) => typeof m === 'string' && m.trim())[0] ?? '';
@@ -320,82 +322,52 @@ function inferAiRoutingDevChoice(args: {
   return { serviceLabel: row.provider || key, modelLabel };
 }
 
-function ktcValueForPlayer(p: Player): number {
-  const v = p.ktc?.superflexValues?.tep?.value;
-  return typeof v === 'number' && Number.isFinite(v) ? v : 0;
-}
-
 function pickKey(p: TradeAnalyzerPick): string {
-  return (
-    p.pick_id ??
-    `${p.owner_roster_id}_${p.season}_${p.round}_${String(p.descriptor ?? '')}`
-  );
+  if (p.pick_id?.trim()) return p.pick_id.trim();
+  return `${p.owner_roster_id}_${p.season}_${p.round}_${String(p.descriptor ?? '')}`;
 }
 
-function pickLabel(p: TradeAnalyzerPick): string {
+function pickLabel(p: TradeAnalyzerPick, ownerRosterId: number): string {
   const d = (p.descriptor || '').trim();
-  return `${p.season} Round ${p.round}${d ? ` (${d})` : ''}`;
+  const base = `${p.season} Round ${p.round}${d ? ` (${d})` : ''}`;
+  if (
+    p.original_roster_id != null &&
+    Number.isFinite(p.original_roster_id) &&
+    p.original_roster_id !== ownerRosterId
+  ) {
+    return `${base} (from R${p.original_roster_id})`;
+  }
+  return base;
 }
 
-function mockAnalyzeResponse(args: {
-  sideAAssets: Array<{ label: string; value: number }>;
-  sideBAssets: Array<{ label: string; value: number }>;
-}): TradeAnalyzerResponse {
-  const aOut = args.sideAAssets.reduce((s, a) => s + a.value, 0);
-  const bOut = args.sideBAssets.reduce((s, a) => s + a.value, 0);
-  const diff = bOut - aOut;
-  const fairness = Math.max(0, Math.min(100, Math.round(50 + diff / 200)));
-  const winner: 'a' | 'b' | 'even' =
-    Math.abs(diff) < 150 ? 'even' : diff > 0 ? 'b' : 'a';
+/** Owned picks for a roster from the dashboard bundle (`picks_by_roster`). */
+function ownedPicksForRoster(
+  rosterId: number | null,
+  picksByRosterId: Map<number, TradeAnalyzerPick[]>
+): TradeAnalyzerPick[] {
+  if (rosterId == null) return [];
+  return picksByRosterId.get(rosterId) ?? [];
+}
 
-  return {
-    fairness_score: fairness,
-    winner,
-    summary_bullets: [
-      'This analysis weighs KTC value, roster construction, and short-term points.',
-      'Consider your contention window and positional depth before finalizing.',
-    ],
-    side_a: {
-      pros: ['Improves lineup flexibility.', 'Converts value into a clearer weekly starter.'],
-      cons: ['Risk of reducing depth at one position.', 'Market value can swing fast after injury news.'],
-      ktc_delta: {
-        values_in: bOut,
-        values_out: aOut,
-        net: bOut - aOut,
-        per_asset: args.sideAAssets,
-      },
-      sleeper_data: {
-        stats_trajectory: [
-          { x: 'Wk1', y: 18.2 },
-          { x: 'Wk2', y: 19.0 },
-          { x: 'Wk3', y: 17.5 },
-          { x: 'Wk4', y: 20.1 },
-        ],
-        positional_impact: 'QB depth improves slightly; WR depth decreases.',
-        needs_addressed: ['Adds one reliable starter.', 'Shifts risk toward fewer high-leverage players.'],
-      },
-    },
-    side_b: {
-      pros: ['Adds depth and optionality.', 'Smoother risk distribution across positions.'],
-      cons: ['May lower weekly ceiling if consolidating talent.', 'Requires active lineup management to realize value.'],
-      ktc_delta: {
-        values_in: aOut,
-        values_out: bOut,
-        net: aOut - bOut,
-        per_asset: args.sideBAssets,
-      },
-      sleeper_data: {
-        stats_trajectory: [
-          { x: 'Wk1', y: 16.9 },
-          { x: 'Wk2', y: 18.1 },
-          { x: 'Wk3', y: 18.0 },
-          { x: 'Wk4', y: 17.4 },
-        ],
-        positional_impact: 'RB depth improves; TE remains stable.',
-        needs_addressed: ['Adds multiple playable pieces.', 'Creates more trade flexibility later.'],
-      },
-    },
-  };
+/** Picks this roster owns that can still be added to the trade (server pick_id required). */
+function picksAvailableToAdd(
+  rosterId: number | null,
+  picksByRosterId: Map<number, TradeAnalyzerPick[]>,
+  selectedPickKeys: Set<string>
+): TradeAnalyzerPick[] {
+  return ownedPicksForRoster(rosterId, picksByRosterId).filter((p) => {
+    if (!p.pick_id?.trim()) return false;
+    if (p.owner_roster_id !== rosterId) return false;
+    return !selectedPickKeys.has(pickKey(p));
+  });
+}
+
+function tradeAnalyzerSeasonWire(seasonNum: number): string {
+  const year = Math.trunc(seasonNum);
+  if (Number.isFinite(year) && year >= 1900 && year <= 3000 && `${year}`.length === 4) {
+    return `${year}`;
+  }
+  return String(new Date().getFullYear());
 }
 
 export const TradeAnalyzerPage: React.FC = () => {
@@ -449,29 +421,50 @@ export const TradeAnalyzerPage: React.FC = () => {
   });
 
   const builderRef = useRef<HTMLDivElement | null>(null);
+  const [history, setHistory] = useState<TradeAnalyzerHistoryEntry[]>([]);
+  const [pinnedAnalysisId, setPinnedAnalysisId] = useState<string | null>(null);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
-  const aiRouting = useMemo(() => {
-    if (taBundle?.allowsClientProviderModelChoice) {
-      return inferAiRoutingDevChoice({
-        providers: state.providers,
-        defaultProvider: taBundle.defaultProvider,
-        chosenProvider: devProvider,
-        chosenModelDraft: devModelDraft,
-      });
-    }
-    return inferAiRoutingFromProviders(state.providers, taBundle?.defaultProvider);
-  }, [state.providers, taBundle, devProvider, devModelDraft]);
+  const allowsClientProviderChoice = Boolean(
+    taBundle?.allowsClientProviderModelChoice
+  );
 
-  const selectedProviderDefaultModel = useMemo(() => {
-    const key =
+  const selectedProviderKey = useMemo(
+    () =>
       devProvider.trim().toLowerCase() ||
       (taBundle?.defaultProvider ?? '').trim().toLowerCase() ||
-      '';
-    const row =
-      state.providers.find((p) => p.provider.toLowerCase() === key) ?? state.providers[0];
-    const m = row?.models?.find((x) => typeof x === 'string' && x.trim());
-    return m?.trim() ?? '';
-  }, [devProvider, taBundle?.defaultProvider, state.providers]);
+      '',
+    [devProvider, taBundle?.defaultProvider]
+  );
+
+  const selectedProviderRow = useMemo(
+    () =>
+      state.providers.find((p) => p.provider.toLowerCase() === selectedProviderKey) ??
+      state.providers[0] ??
+      null,
+    [state.providers, selectedProviderKey]
+  );
+
+  const selectableModels = useMemo(() => {
+    if (!selectedProviderRow?.healthy) return [];
+    return (selectedProviderRow.models ?? []).filter(
+      (m): m is string => typeof m === 'string' && !!m.trim()
+    );
+  }, [selectedProviderRow]);
+
+  const modelSelectDisabled =
+    !selectedProviderRow?.healthy || selectableModels.length === 0;
+
+  const serverDefaultModelLabel = useMemo(() => {
+    const fromApi = selectedProviderRow?.models?.[0]?.trim();
+    if (fromApi) return fromApi;
+    return '';
+  }, [selectedProviderRow]);
+
+  const modelSelectOptions = useMemo(
+    () => buildModelSelectOptions(selectableModels, serverDefaultModelLabel),
+    [selectableModels, serverDefaultModelLabel]
+  );
 
   const [rateLimitNowMs, setRateLimitNowMs] = useState<number>(() => Date.now());
   useEffect(() => {
@@ -500,18 +493,12 @@ export const TradeAnalyzerPage: React.FC = () => {
   useEffect(() => {
     if (!leagueIdReady) return;
     let cancelled = false;
-    (async () => {
-      try {
-        const db = await openDB('sleeper-players-db', 3);
-        const last = (await db.get('app_prefs', 'trade_analyzer_last_result')) as
-          | { createdAt: number; request: TradeAnalyzerRequest; response: TradeAnalyzerResponse }
-          | undefined;
-        if (!cancelled && last?.response) {
-          dispatch({ type: 'analyzeReady', analyzedAt: last.createdAt, data: last.response });
-        }
-      } catch {
-        // ignore
-      }
+    void (async () => {
+      const entries = await loadTradeAnalyzerHistory();
+      if (cancelled) return;
+      setHistory(entries);
+      setPinnedAnalysisId(null);
+      setExpandedHistoryId(null);
     })();
     return () => {
       cancelled = true;
@@ -544,52 +531,62 @@ export const TradeAnalyzerPage: React.FC = () => {
       return;
     }
     let cancelled = false;
-    (async () => {
-      try {
-        const db = await openDB('sleeper-players-db', 3);
-        const row = (await db.get(
-          'app_prefs',
-          'trade_analyzer_prefs'
-        )) as { key: string; provider?: string | null; model?: string | null } | undefined;
-        if (cancelled) return;
-        const p =
-          typeof row?.provider === 'string' && row.provider.trim()
-            ? row.provider.trim().toLowerCase()
-            : taBundle.defaultProvider;
-        setDevProvider(p);
-        setDevModelDraft(typeof row?.model === 'string' ? row.model : '');
-        setTaPrefsHydratedInternal(true);
-      } catch {
-        if (!cancelled) {
-          setDevProvider(taBundle.defaultProvider);
-          setDevModelDraft('');
-          setTaPrefsHydratedInternal(true);
-        }
-      }
+    void (async () => {
+      const saved = await loadTradeAnalyzerPrefs();
+      if (cancelled) return;
+      setDevProvider(saved?.provider || taBundle.defaultProvider);
+      setDevModelDraft(saved?.model ?? '');
+      setTaPrefsHydratedInternal(true);
     })();
     return () => {
       cancelled = true;
     };
   }, [taBundle?.allowsClientProviderModelChoice, taBundle?.defaultProvider]);
 
+  const devModelSelectValue = useMemo(() => {
+    const m = devModelDraft.trim();
+    return m && selectableModels.includes(m) ? m : '';
+  }, [devModelDraft, selectableModels]);
+
+  const aiRouting = useMemo(() => {
+    if (allowsClientProviderChoice && taBundle) {
+      return inferAiRoutingDevChoice({
+        providers: state.providers,
+        defaultProvider: taBundle.defaultProvider,
+        chosenProvider: devProvider,
+        chosenModelDraft: devModelSelectValue,
+        allowsClientChoice: true,
+      });
+    }
+    return inferAiRoutingFromProviders(
+      state.providers,
+      taBundle?.defaultProvider,
+      allowsClientProviderChoice
+    );
+  }, [
+    state.providers,
+    taBundle,
+    devProvider,
+    devModelSelectValue,
+    allowsClientProviderChoice,
+  ]);
+
   useEffect(() => {
     if (!taPrefsHydrated || !taBundle?.allowsClientProviderModelChoice) return;
     const t = window.setTimeout(() => {
-      void (async () => {
-        try {
-          const db = await openDB('sleeper-players-db', 3);
-          await db.put('app_prefs', {
-            key: 'trade_analyzer_prefs',
-            provider: devProvider.trim().toLowerCase() || taBundle.defaultProvider,
-            model: devModelDraft.trim() || null,
-          });
-        } catch {
-          // ignore
-        }
-      })();
+      void saveTradeAnalyzerPrefs(
+        devProvider.trim().toLowerCase() || taBundle.defaultProvider,
+        devModelSelectValue || null
+      );
     }, 450);
     return () => window.clearTimeout(t);
-  }, [devProvider, devModelDraft, taPrefsHydrated, taBundle?.allowsClientProviderModelChoice, taBundle?.defaultProvider]);
+  }, [
+    devProvider,
+    devModelSelectValue,
+    taPrefsHydrated,
+    taBundle?.allowsClientProviderModelChoice,
+    taBundle?.defaultProvider,
+  ]);
 
   useEffect(() => {
     const onKeyDown = (ev: KeyboardEvent) => {
@@ -647,17 +644,43 @@ export const TradeAnalyzerPage: React.FC = () => {
     [state.sideB.assets]
   );
 
-  const sideASelectedPicks = useMemo(() => {
-    if (!state.sideA.rosterId) return [];
-    const all = picksByRosterId.get(state.sideA.rosterId) ?? [];
-    return all.filter((p) => sideASelectedPickKeys.has(pickKey(p)));
-  }, [picksByRosterId, sideASelectedPickKeys, state.sideA.rosterId]);
+  const sideAOwnedPicks = useMemo(
+    () => ownedPicksForRoster(state.sideA.rosterId, picksByRosterId),
+    [picksByRosterId, state.sideA.rosterId]
+  );
+  const sideBOwnedPicks = useMemo(
+    () => ownedPicksForRoster(state.sideB.rosterId, picksByRosterId),
+    [picksByRosterId, state.sideB.rosterId]
+  );
 
-  const sideBSelectedPicks = useMemo(() => {
-    if (!state.sideB.rosterId) return [];
-    const all = picksByRosterId.get(state.sideB.rosterId) ?? [];
-    return all.filter((p) => sideBSelectedPickKeys.has(pickKey(p)));
-  }, [picksByRosterId, sideBSelectedPickKeys, state.sideB.rosterId]);
+  const sideAPicksToAdd = useMemo(
+    () =>
+      picksAvailableToAdd(
+        state.sideA.rosterId,
+        picksByRosterId,
+        sideASelectedPickKeys
+      ),
+    [picksByRosterId, sideASelectedPickKeys, state.sideA.rosterId]
+  );
+  const sideBPicksToAdd = useMemo(
+    () =>
+      picksAvailableToAdd(
+        state.sideB.rosterId,
+        picksByRosterId,
+        sideBSelectedPickKeys
+      ),
+    [picksByRosterId, sideBSelectedPickKeys, state.sideB.rosterId]
+  );
+
+  const sideASelectedPicks = useMemo(
+    () => sideAOwnedPicks.filter((p) => sideASelectedPickKeys.has(pickKey(p))),
+    [sideAOwnedPicks, sideASelectedPickKeys]
+  );
+
+  const sideBSelectedPicks = useMemo(
+    () => sideBOwnedPicks.filter((p) => sideBSelectedPickKeys.has(pickKey(p))),
+    [sideBOwnedPicks, sideBSelectedPickKeys]
+  );
 
   const sideASelectedPlayers = useMemo(() => {
     const out: Player[] = [];
@@ -689,52 +712,32 @@ export const TradeAnalyzerPage: React.FC = () => {
     [sideBSelectedPlayers, sideBSelectedPicks]
   );
 
+  const hasTradeBuilderAssets =
+    state.sideA.assets.length > 0 || state.sideB.assets.length > 0;
+
   const canAnalyze =
     isReady &&
     state.sideA.rosterId != null &&
     state.sideB.rosterId != null &&
-    (state.sideA.assets.length > 0 || state.sideB.assets.length > 0) &&
     state.sideA.assets.length > 0 &&
     state.sideB.assets.length > 0 &&
     state.results.status !== 'loading' &&
     !isRateLimited;
 
-  const fairness = state.results.status === 'ready' ? state.results.data.fairness_score : 50;
-  const winnerLabel =
-    state.results.status === 'ready'
-      ? state.results.data.winner === 'even'
-        ? 'Even trade'
-        : state.results.data.winner === 'a'
-          ? 'Side A wins'
-          : 'Side B wins'
-      : null;
+  const displayPinnedId = hasTradeBuilderAssets ? pinnedAnalysisId : null;
 
-  const sideAAssetLabels = useMemo(() => {
-    return sideASelectedPlayers.map((p) => {
-      const name =
-        `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() ||
-        p.playerName ||
-        'Player';
-      const ktc = ktcValueForPlayer(p);
-      return { key: p.player_id ?? name, label: name, position: p.position, ktc };
-    });
-  }, [sideASelectedPlayers]);
+  const pinnedEntry = useMemo(
+    () => history.find((e) => e.id === displayPinnedId) ?? null,
+    [history, displayPinnedId]
+  );
 
-  const sideBAssetLabels = useMemo(() => {
-    return sideBSelectedPlayers.map((p) => {
-      const name =
-        `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() ||
-        p.playerName ||
-        'Player';
-      const ktc = ktcValueForPlayer(p);
-      return { key: p.player_id ?? name, label: name, position: p.position, ktc };
-    });
-  }, [sideBSelectedPlayers]);
+  const showPinnedResults =
+    pinnedEntry != null && state.results.status !== 'loading';
 
-  const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const showRecentSection = history.length > 0 && (!showPinnedResults || !hasTradeBuilderAssets);
 
   return (
-    <div className='mx-auto w-full max-w-xl px-3 py-4 sm:max-w-2xl sm:px-5 sm:py-5 md:max-w-4xl md:px-6 lg:max-w-5xl'>
+    <div className='w-full'>
       <div ref={builderRef} className='rounded-xl border border-white/10 bg-[#0d1e2e] p-4 sm:p-5'>
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div>
@@ -758,31 +761,50 @@ export const TradeAnalyzerPage: React.FC = () => {
           <div className='flex items-center justify-between gap-2 sm:justify-end'>
             <button
               type='button'
-              className='inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs sm:text-sm font-semibold text-gray-200 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main'
+              className={`inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs sm:text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main ${
+                settingsOpen
+                  ? 'border-primary-main/40 bg-primary-main/15 text-white hover:bg-primary-main/25'
+                  : 'border-white/15 bg-white/5 text-gray-200 hover:border-white/25 hover:bg-white/10 hover:text-white'
+              }`}
               onClick={() => setSettingsOpen((v) => !v)}
               aria-expanded={settingsOpen}
-              aria-label='Show AI routing details and health checks'
+              aria-controls='trade-analyzer-ai-settings'
+              aria-label={
+                settingsOpen
+                  ? 'Close AI settings panel'
+                  : 'Open AI settings panel'
+              }
             >
               <SettingsIcon className='h-4 w-4' />
-              AI details
+              AI Settings
+              {settingsOpen ? (
+                <ChevronUpIcon className='h-4 w-4 text-primary-main' aria-hidden />
+              ) : (
+                <ChevronDownIcon className='h-4 w-4 text-gray-400' aria-hidden />
+              )}
             </button>
           </div>
         </div>
 
         {settingsOpen ? (
-          <div className='mt-3 rounded-lg border border-white/10 bg-black/10 p-3 text-xs sm:text-sm text-gray-300'>
+          <div
+            id='trade-analyzer-ai-settings'
+            className='mt-3 rounded-lg border border-primary-main/25 bg-black/10 p-3 text-xs sm:text-sm text-gray-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+          >
             <p className='text-xs sm:text-sm text-gray-400'>
               {taBundle == null ? (
                 <>Loading…</>
               ) : taBundle.allowsClientProviderModelChoice ? (
                 <>
-                  Dev: optional <span className='font-semibold text-gray-200'>provider / model</span>{' '}
-                  override.
+                  Local dev: choose a <span className='font-semibold text-gray-200'>provider</span> and{' '}
+                  <span className='font-semibold text-gray-200'>model</span> from what the server reports
+                  as available.
                 </>
               ) : (
                 <>
-                  API uses <span className='font-semibold text-gray-200'>Anthropic</span> only; model
-                  comes from server config.
+                  Production uses <span className='font-semibold text-gray-200'>Gemini</span> only.
+                  Anthropic, echo, and ollama stay wired up but are disabled here until
+                  configured.
                 </>
               )}
             </p>
@@ -793,32 +815,45 @@ export const TradeAnalyzerPage: React.FC = () => {
                   <select
                     className='mt-1 w-full rounded-lg border border-white/10 bg-[#0b1624] px-2 py-2 text-sm text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main'
                     value={devProvider.trim().toLowerCase() || taBundle.defaultProvider}
-                    onChange={(ev) =>
-                      setDevProvider(ev.target.value.trim().toLowerCase())
-                    }
+                    onChange={(ev) => {
+                      setDevProvider(ev.target.value.trim().toLowerCase());
+                      setDevModelDraft('');
+                    }}
                   >
-                    {state.providers.map((p) => (
-                      <option key={p.provider} value={p.provider.toLowerCase()}>
-                        {p.provider}
-                        {p.healthy ? '' : ' (unavailable)'}
-                      </option>
-                    ))}
+                    {state.providers.map((p) => {
+                      const key = p.provider.toLowerCase();
+                      const uiDisabled = isProviderUiDisabled(key, allowsClientProviderChoice);
+                      const unavailable = uiDisabled || !p.healthy;
+                      return (
+                        <option key={p.provider} value={key} disabled={uiDisabled}>
+                          {p.provider}
+                          {unavailable ? ' (unavailable)' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </label>
                 <label className='block text-xs sm:text-sm'>
-                  <span className='font-semibold text-gray-200'>Model override</span>
-                  <input
-                    type='text'
-                    className='mt-1 w-full rounded-lg border border-white/10 bg-[#0b1624] px-2 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main'
-                    placeholder={
-                      selectedProviderDefaultModel ||
-                      'Leave blank for server default'
-                    }
-                    value={devModelDraft}
+                  <span className='font-semibold text-gray-200'>Model</span>
+                  <select
+                    className='mt-1 w-full rounded-lg border border-white/10 bg-[#0b1624] px-2 py-2 text-sm text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main disabled:opacity-60'
+                    value={devModelSelectValue}
+                    disabled={modelSelectDisabled}
                     onChange={(ev) => setDevModelDraft(ev.target.value)}
-                    autoComplete='off'
-                    spellCheck={false}
-                  />
+                  >
+                    {modelSelectOptions.map((opt) => (
+                      <option key={opt.value || '__default__'} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  {modelSelectDisabled ? (
+                    <p className='mt-1 text-xs text-gray-400'>
+                      {!selectedProviderRow?.healthy
+                        ? 'This provider is unavailable. Choose another provider or fix its configuration.'
+                        : 'No models are available for this provider.'}
+                    </p>
+                  ) : null}
                 </label>
                 <p className='sm:col-span-2 text-xs text-gray-400'>
                   Saved in this browser until you clear site data.
@@ -847,17 +882,24 @@ export const TradeAnalyzerPage: React.FC = () => {
                   No provider rows returned. The backend may be offline or the endpoint may have changed.
                 </div>
               ) : (
-                state.providers.map((p) => (
-                  <div
-                    key={p.provider}
-                    className='rounded-md border border-white/10 bg-white/5 p-2 text-[10px] sm:text-xs text-gray-300'
-                  >
-                    <span className='font-semibold text-gray-200'>{p.provider}</span>{' '}
-                    <span className={p.healthy ? 'text-green-300' : 'text-red-300'}>
-                      {p.healthy ? 'healthy' : 'unhealthy'}
-                    </span>
-                  </div>
-                ))
+                state.providers.map((p) => {
+                  const uiAvailable = providerUiAvailable(p, allowsClientProviderChoice);
+                  return (
+                    <div
+                      key={p.provider}
+                      className='rounded-md border border-white/10 bg-white/5 p-2 text-[10px] sm:text-xs text-gray-300'
+                    >
+                      <span className='font-semibold text-gray-200'>{p.provider}</span>{' '}
+                      <span className={uiAvailable ? 'text-green-300' : 'text-red-300'}>
+                        {uiAvailable
+                          ? 'healthy'
+                          : isProviderUiDisabled(p.provider, allowsClientProviderChoice)
+                            ? 'unavailable'
+                            : 'unhealthy'}
+                      </span>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
@@ -881,7 +923,9 @@ export const TradeAnalyzerPage: React.FC = () => {
             selectedPlayers={sideASelectedPlayers}
             selectedPicks={sideASelectedPicks}
             subtotal={sideASubtotal}
-            picks={state.sideA.rosterId ? (picksByRosterId.get(state.sideA.rosterId) ?? []) : []}
+            otherSubtotal={sideBSubtotal}
+            picksToAdd={sideAPicksToAdd}
+            ownedPickCount={sideAOwnedPicks.length}
             selectedPickKeys={sideASelectedPickKeys}
             onActive={() => dispatch({ type: 'setActiveSide', side: 'a' })}
             onRosterChange={(rid) => dispatch({ type: 'setRoster', side: 'a', rosterId: rid })}
@@ -900,7 +944,9 @@ export const TradeAnalyzerPage: React.FC = () => {
             selectedPlayers={sideBSelectedPlayers}
             selectedPicks={sideBSelectedPicks}
             subtotal={sideBSubtotal}
-            picks={state.sideB.rosterId ? (picksByRosterId.get(state.sideB.rosterId) ?? []) : []}
+            otherSubtotal={sideASubtotal}
+            picksToAdd={sideBPicksToAdd}
+            ownedPickCount={sideBOwnedPicks.length}
             selectedPickKeys={sideBSelectedPickKeys}
             onActive={() => dispatch({ type: 'setActiveSide', side: 'b' })}
             onRosterChange={(rid) => dispatch({ type: 'setRoster', side: 'b', rosterId: rid })}
@@ -939,15 +985,7 @@ export const TradeAnalyzerPage: React.FC = () => {
               dispatch({ type: 'setRateLimitUntil', untilMs: null, message: null });
               dispatch({ type: 'analyzeStart' });
 
-              const seasonNum = tradeAnalysisSeason;
-              const seasonFallback = String(new Date().getFullYear());
-              const seasonWire =
-                Number.isFinite(seasonNum) &&
-                seasonNum >= 1900 &&
-                seasonNum <= 3000 &&
-                `${Math.trunc(seasonNum)}`.length === 4
-                  ? `${Math.trunc(seasonNum)}`
-                  : seasonFallback;
+              const seasonWire = tradeAnalyzerSeasonWire(tradeAnalysisSeason);
 
               const playerIdsFrom = (list: Player[]) =>
                 list
@@ -956,7 +994,7 @@ export const TradeAnalyzerPage: React.FC = () => {
 
               const req: TradeAnalyzerRequest = {
                 league_id: selectedLeagueId,
-                season: /^\d{4}$/.test(seasonWire) ? seasonWire : seasonFallback,
+                season: seasonWire,
                 side_a: {
                   roster_id: state.sideA.rosterId ?? 0,
                   player_ids: playerIdsFrom(sideASelectedPlayers),
@@ -970,30 +1008,36 @@ export const TradeAnalyzerPage: React.FC = () => {
                 additional_context: state.context.trim() || undefined,
               };
 
-              if (taBundle?.allowsClientProviderModelChoice) {
+              if (allowsClientProviderChoice && taBundle) {
                 const p =
                   devProvider.trim().toLowerCase() || taBundle.defaultProvider;
                 if (p) req.provider = p;
-                const m = devModelDraft.trim();
-                if (m) req.model = m;
+                if (devModelSelectValue) req.model = devModelSelectValue;
               }
 
               const analyzedAt = Date.now();
               void (async () => {
                 try {
                   const res = await analyzeTrade(req);
-                  dispatch({ type: 'analyzeReady', analyzedAt, data: res });
-                  try {
-                    const db = await openDB('sleeper-players-db', 3);
-                    await db.put('app_prefs', {
-                      key: 'trade_analyzer_last_result',
-                      createdAt: analyzedAt,
-                      request: req,
-                      response: res,
-                    });
-                  } catch {
-                    // ignore
-                  }
+                  const entry = buildTradeAnalyzerHistoryEntry({
+                    leagueId: selectedLeagueId,
+                    createdAt: analyzedAt,
+                    request: req,
+                    response: res,
+                    additionalContext: state.context,
+                    sideATeam,
+                    sideBTeam,
+                    sideAPlayers: sideASelectedPlayers,
+                    sideBPlayers: sideBSelectedPlayers,
+                    sideAPicks: sideASelectedPicks,
+                    sideBPicks: sideBSelectedPicks,
+                    pickLabel,
+                  });
+                  const nextHistory = await saveTradeAnalyzerHistory(entry);
+                  setHistory(nextHistory);
+                  setPinnedAnalysisId(entry.id);
+                  setExpandedHistoryId(null);
+                  dispatch({ type: 'analyzeReady' });
                   const el = document.getElementById('trade-analyzer-results');
                   el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 } catch (e) {
@@ -1013,16 +1057,7 @@ export const TradeAnalyzerPage: React.FC = () => {
                           : 'Analyze failed',
                     });
                   }
-                  dispatch({ type: 'analyzeReady', analyzedAt, data: mockAnalyzeResponse({
-                    sideAAssets: sideASelectedPlayers.map((p) => ({
-                      label: `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || (p.playerName ?? 'Player'),
-                      value: ktcValueForPlayer(p),
-                    })),
-                    sideBAssets: sideBSelectedPlayers.map((p) => ({
-                      label: `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || (p.playerName ?? 'Player'),
-                      value: ktcValueForPlayer(p),
-                    })),
-                  }) });
+                  dispatch({ type: 'analyzeFailed' });
                 }
               })();
             }}
@@ -1049,109 +1084,29 @@ export const TradeAnalyzerPage: React.FC = () => {
         </div>
       </div>
 
-      {state.results.status === 'ready' ? (
-        <div
-          id='trade-analyzer-results'
-          className='mt-4 rounded-xl border border-white/10 bg-[#0d1e2e] p-4 sm:p-5'
-        >
-          <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
-            <div>
-              <div className='text-base sm:text-lg font-semibold text-gray-100'>Analysis Results</div>
-              <div className='mt-1 text-xs sm:text-sm text-gray-400'>
-                Analyzed at {new Date(state.results.analyzedAt).toLocaleString()}
-              </div>
-            </div>
-            <button
-              type='button'
-              className='inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs sm:text-sm font-semibold text-gray-200 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main'
-              onClick={() => {
-                dispatch({ type: 'resetAll' });
-                void (async () => {
-                  try {
-                    const db = await openDB('sleeper-players-db', 3);
-                    await db.delete('app_prefs', 'trade_analyzer_last_result');
-                  } catch {
-                    // ignore
-                  }
-                })();
-                builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }}
-            >
-              Run another
-            </button>
-          </div>
-
-        <div className='mt-3 rounded-xl border border-white/10 bg-black/10 p-3 sm:p-4'>
-            <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-              <div>
-                <div className='text-xs sm:text-sm font-semibold text-gray-200'>Fairness score</div>
-              </div>
-              {winnerLabel ? (
-                <div className='inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs sm:text-sm font-semibold text-gray-100'>
-                  {winnerLabel}
-                </div>
-              ) : null}
-            </div>
-
-            <div className='mt-3'>
-              <FairnessGauge value={fairness} />
-            </div>
-
-            <div className='mt-3 grid grid-cols-1 gap-3 md:grid-cols-2'>
-              <TradeAssetStrip
-                title='Side A assets'
-                emptyLabel='No assets selected'
-                assets={sideAAssetLabels}
-              />
-              <TradeAssetStrip
-                title='Side B assets'
-                emptyLabel='No assets selected'
-                assets={sideBAssetLabels}
-              />
-            </div>
-          </div>
-
-          <div className='mt-3 rounded-xl border border-white/10 bg-black/10 p-3 sm:p-4'>
-            <div className='flex items-start justify-between gap-2'>
-              <div className='text-xs sm:text-sm font-semibold text-gray-200'>Summary</div>
-              <button
-                type='button'
-                className='btn-ghost text-[10px] sm:text-xs font-semibold text-gray-300 hover:text-white'
-                onClick={() => setSummaryExpanded((v) => !v)}
-                aria-expanded={summaryExpanded}
-              >
-                {summaryExpanded ? 'Hide' : 'Show'}
-              </button>
-            </div>
-            <div className='mt-2 text-xs sm:text-sm text-gray-300'>
-              {summaryExpanded ? (
-                <ul className='list-disc pl-5 space-y-1'>
-                  {state.results.data.summary_bullets.map((s) => (
-                    <li key={s}>{s}</li>
-                  ))}
-                </ul>
-              ) : (
-                <div className='line-clamp-2 text-gray-300'>
-                  {state.results.data.summary_bullets.slice(0, 1)[0] ?? ''}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className='mt-3 grid grid-cols-1 gap-4 md:grid-cols-2'>
-            <ResultsColumn
-              title='Side A'
-              team={sideATeam}
-              data={state.results.data.side_a}
-            />
-            <ResultsColumn
-              title='Side B'
-              team={sideBTeam}
-              data={state.results.data.side_b}
-            />
-          </div>
-        </div>
+      {showRecentSection ? (
+        <RecentTradeAnalysesSection
+          entries={history}
+          expandedId={expandedHistoryId}
+          pinnedId={showPinnedResults ? displayPinnedId : null}
+          onToggleExpand={(id: string) =>
+            setExpandedHistoryId((cur) => (cur === id ? null : id))
+          }
+        />
       ) : null}
+
+      {showPinnedResults && pinnedEntry ? (
+        <AnalysisResultsPanel
+          entry={pinnedEntry}
+          onRunAnother={() => {
+            setPinnedAnalysisId(null);
+            setExpandedHistoryId(null);
+            dispatch({ type: 'resetAll' });
+            builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+        />
+      ) : null}
+
     </div>
   );
 };
@@ -1165,10 +1120,12 @@ function SideCard(props: {
   otherRosterId: number | null;
   selectedPlayerIds: Set<string>;
   selectedPlayers: Player[];
-  picks: TradeAnalyzerPick[];
+  picksToAdd: TradeAnalyzerPick[];
+  ownedPickCount: number;
   selectedPickKeys: Set<string>;
   selectedPicks: TradeAnalyzerPick[];
   subtotal: number;
+  otherSubtotal: number;
   onActive: () => void;
   onRosterChange: (rosterId: number | null) => void;
   onTogglePlayer: (playerId: string) => void;
@@ -1184,6 +1141,8 @@ function SideCard(props: {
     if (!selectedTeam) return [];
     return groupPlayersByPosition(sortPlayersByName(selectedTeam.players));
   }, [selectedTeam]);
+
+  const valueTone = toneForSide(props.subtotal, props.otherSubtotal);
 
   return (
     <div
@@ -1263,50 +1222,60 @@ function SideCard(props: {
 
           <div className='mt-3'>
             <div className='flex items-center justify-between gap-2'>
-              <div className='text-xs sm:text-sm font-semibold text-gray-200'>Trading away</div>
-              <div className='text-[10px] sm:text-xs text-gray-400'>
-                Subtotal {props.subtotal.toLocaleString()}
+              <div className='text-xs font-semibold text-gray-200 sm:text-sm'>Trading away</div>
+              <div
+                className={`text-base font-bold tabular-nums sm:text-lg ${tradeValueToneClass(valueTone)}`}
+              >
+                {props.subtotal.toLocaleString()}
               </div>
             </div>
             {props.selectedPlayers.length === 0 && props.selectedPicks.length === 0 ? (
-              <div className='mt-2 text-xs sm:text-sm text-gray-400'>No assets yet.</div>
+              <div className='mt-2 text-xs text-gray-400 sm:text-sm'>No assets yet.</div>
             ) : (
-              <div className='mt-2 flex flex-wrap gap-2'>
+              <div className='mt-2 space-y-2'>
                 {props.selectedPlayers.map((p) => {
-                  const name =
-                    `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || p.playerName || 'Player';
+                  const name = playerDisplayName(p);
+                  const ktc = ktcValueForPlayer(p);
                   return (
-                    <button
+                    <TradeAssetTag
                       key={p.player_id}
-                      type='button'
-                      className={`${TRADE_PLAYER_CHIP} ${tradePlayerChipBorder(p.position)} inline-flex min-h-10 min-w-[44px] px-2.5 py-1.5 sm:min-h-9 sm:px-2 sm:py-1`}
-                      onClick={() => p.player_id && props.onTogglePlayer(p.player_id)}
-                      aria-label={`Remove ${name} from ${props.title}`}
-                    >
-                      {name}
-                    </button>
+                      asset={{
+                        key: p.player_id ?? name,
+                        name,
+                        position: p.position,
+                        ktc,
+                        rankLabel: playerRankLabel(p),
+                      }}
+                      valueTone={valueTone}
+                      onRemove={() => p.player_id && props.onTogglePlayer(p.player_id)}
+                      removeLabel={`Remove ${name} from ${props.title}`}
+                    />
                   );
                 })}
                 {props.selectedPicks.map((p) => {
                   const key = pickKey(p);
-                  const label = pickLabel(p);
+                  const label = pickLabel(p, props.selectedRosterId ?? p.owner_roster_id);
                   const ktc = p.ktc_value ?? 0;
                   return (
-                    <button
+                    <TradeAssetTag
                       key={key}
-                      type='button'
-                      className={`${TRADE_PICK_CHIP} min-h-10 px-2.5 py-1.5 sm:min-h-9 sm:px-2 sm:py-1`}
-                      onClick={() => props.onTogglePick(key)}
-                      aria-label={`Remove ${label} from ${props.title}`}
-                      title={ktc ? `KTC ${ktc}` : undefined}
-                    >
-                      {label}
-                    </button>
+                      isPick
+                      asset={{
+                        key,
+                        name: label,
+                        ktc,
+                        rankLabel: null,
+                      }}
+                      valueTone={valueTone}
+                      onRemove={() => props.onTogglePick(key)}
+                      removeLabel={`Remove ${label} from ${props.title}`}
+                    />
                   );
                 })}
               </div>
             )}
           </div>
+
 
           <div className='mt-4 rounded-lg border border-white/10 bg-white/5 p-3'>
             <div className='text-xs sm:text-sm font-semibold text-gray-200'>
@@ -1334,10 +1303,7 @@ function SideCard(props: {
                     {g.players.map((p) => {
                       const id = p.player_id;
                       if (!id) return null;
-                      const name =
-                        `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() ||
-                        p.playerName ||
-                        'Player';
+                      const name = playerDisplayName(p);
                       const ktc = ktcValueForPlayer(p);
                       const already = props.selectedPlayerIds.has(id);
                       const label = ktc > 0 ? `${name} (${ktc})` : name;
@@ -1355,9 +1321,14 @@ function SideCard(props: {
 
           <div className='mt-3 rounded-lg border border-white/10 bg-white/5 p-3'>
             <div className='text-xs sm:text-sm font-semibold text-gray-200'>Add picks</div>
-            {props.picks.length === 0 ? (
+            {props.ownedPickCount === 0 ? (
               <div className='mt-2 text-xs sm:text-sm text-gray-400'>
-                Picks are not available for this league yet.
+                No owned draft picks for this team yet. Refresh league data from Sleeper
+                so traded picks sync, then reload the dashboard.
+              </div>
+            ) : props.picksToAdd.length === 0 ? (
+              <div className='mt-2 text-xs sm:text-sm text-gray-400'>
+                All of this team&apos;s owned picks are already in the trade.
               </div>
             ) : (
               <div className='mt-2'>
@@ -1370,20 +1341,22 @@ function SideCard(props: {
                   onChange={(ev) => {
                     const key = ev.target.value;
                     if (!key) return;
-                    if (!props.selectedPickKeys.has(key)) {
-                      props.onTogglePick(key);
-                    }
+                    const allowed = new Set(
+                      props.picksToAdd.map((p) => pickKey(p))
+                    );
+                    if (!allowed.has(key)) return;
+                    props.onTogglePick(key);
                     ev.currentTarget.value = '';
                   }}
                 >
                   <option value=''>Select a pick to add</option>
-                  {props.picks.map((p) => {
+                  {props.picksToAdd.map((p) => {
                     const key = pickKey(p);
-                    const label = pickLabel(p);
+                    const rid = props.selectedRosterId ?? p.owner_roster_id;
+                    const label = pickLabel(p, rid);
                     const ktc = p.ktc_value ?? 0;
-                    const already = props.selectedPickKeys.has(key);
                     return (
-                      <option key={key} value={key} disabled={already}>
+                      <option key={key} value={key}>
                         {ktc ? `${label} (${ktc})` : label}
                       </option>
                     );
@@ -1398,166 +1371,4 @@ function SideCard(props: {
   );
 }
 
-function FairnessGauge({ value }: { value: number }) {
-  const clamped = Math.max(0, Math.min(100, value));
-  const left = `${clamped}%`;
-  return (
-    <div className='relative h-10'>
-      <div className='h-3 w-full rounded-full bg-linear-to-r from-red-500/70 via-gray-300/40 to-green-500/70' />
-      <div
-        className='absolute top-0 -mt-1.5 h-6 w-0'
-        style={{ left }}
-        aria-hidden
-      >
-        <div className='-translate-x-1/2'>
-          <div className='h-6 w-1 rounded-full bg-white shadow-[0_0_0_2px_rgba(0,0,0,0.35)]' />
-        </div>
-      </div>
-      <div className='mt-2 flex items-center justify-between text-[10px] sm:text-xs text-gray-400'>
-        <span>0</span>
-        <span>50</span>
-        <span>100</span>
-      </div>
-    </div>
-  );
-}
-
-function TradeAssetStrip(props: {
-  title: string;
-  emptyLabel: string;
-  assets: Array<{ key: string; label: string; position?: string; ktc: number }>;
-}) {
-  return (
-    <div className='rounded-lg border border-white/10 bg-white/5 p-3'>
-      <div className='flex items-center justify-between gap-2'>
-        <div className='text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-gray-400'>
-          {props.title}
-        </div>
-        <div className='text-[10px] sm:text-xs tabular-nums text-gray-400'>
-          {props.assets.reduce((s, a) => s + (a.ktc || 0), 0).toLocaleString()}
-        </div>
-      </div>
-      {props.assets.length === 0 ? (
-        <div className='mt-2 text-xs sm:text-sm text-gray-400'>{props.emptyLabel}</div>
-      ) : (
-        <div className='mt-2 flex flex-wrap gap-2'>
-          {props.assets.map((a) => (
-            <span
-              key={a.key}
-              className={`${TRADE_PLAYER_CHIP} ${tradePlayerChipBorder(a.position)} inline-flex min-h-10 min-w-[44px] px-2.5 py-1.5 sm:min-h-9 sm:px-2 sm:py-1`}
-              title={a.ktc > 0 ? `KTC ${a.ktc}` : undefined}
-            >
-              {a.label}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ResultsColumn(props: {
-  title: string;
-  team: TeamData | null;
-  data: TradeAnalyzerResponse['side_a'];
-}) {
-  return (
-    <div className='rounded-xl border border-white/10 bg-black/10 p-3 sm:p-4'>
-      <div className='flex items-start justify-between gap-2'>
-        <div>
-          <div className='text-sm sm:text-base font-semibold text-gray-100'>{props.title}</div>
-          <div className='mt-1 text-xs sm:text-sm text-gray-400'>
-            {props.team ? teamDisplayName(props.team) : 'Team not selected'}
-          </div>
-        </div>
-      </div>
-
-      <div className='mt-3 grid grid-cols-1 gap-3'>
-        <div className='rounded-lg border border-white/10 bg-white/5 p-3'>
-          <div className='text-xs sm:text-sm font-semibold text-gray-200'>Pros</div>
-          <ul className='mt-2 list-disc pl-5 text-xs sm:text-sm text-gray-300 space-y-1'>
-            {props.data.pros.map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ul>
-        </div>
-        <div className='rounded-lg border border-white/10 bg-white/5 p-3'>
-          <div className='text-xs sm:text-sm font-semibold text-gray-200'>Cons</div>
-          <ul className='mt-2 list-disc pl-5 text-xs sm:text-sm text-gray-300 space-y-1'>
-            {props.data.cons.map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className='rounded-lg border border-white/10 bg-white/5 p-3'>
-          <div className='flex items-center justify-between gap-2'>
-            <div className='text-xs sm:text-sm font-semibold text-gray-200'>KTC Delta</div>
-          </div>
-          <div className='mt-2 grid grid-cols-3 gap-2 text-xs sm:text-sm'>
-            <div className='rounded-md border border-white/10 bg-black/10 p-2'>
-              <div className='text-gray-400'>Value in</div>
-              <div className='mt-1 text-sm sm:text-base font-semibold tabular-nums text-gray-100'>
-                {props.data.ktc_delta.values_in.toLocaleString()}
-              </div>
-            </div>
-            <div className='rounded-md border border-white/10 bg-black/10 p-2'>
-              <div className='text-gray-400'>Value out</div>
-              <div className='mt-1 text-sm sm:text-base font-semibold tabular-nums text-gray-100'>
-                {props.data.ktc_delta.values_out.toLocaleString()}
-              </div>
-            </div>
-            <div className='rounded-md border border-white/10 bg-black/10 p-2'>
-              <div className='text-gray-400'>Net</div>
-              <div className='mt-1 text-sm sm:text-base font-semibold tabular-nums text-gray-100'>
-                {props.data.ktc_delta.net.toLocaleString()}
-              </div>
-            </div>
-          </div>
-
-          <div className='mt-3 overflow-hidden rounded-md border border-white/10'>
-            <table className='min-w-full border-collapse text-xs sm:text-sm'>
-              <thead className='bg-black/20'>
-                <tr className='border-b border-white/10'>
-                  <th className='p-2 text-left font-semibold text-gray-300'>Asset</th>
-                  <th className='p-2 text-right font-semibold text-gray-300'>KTC</th>
-                </tr>
-              </thead>
-              <tbody>
-                {props.data.ktc_delta.per_asset.map((a) => (
-                  <tr key={a.label} className='border-b border-white/5 last:border-b-0'>
-                    <td className='p-2 text-gray-100'>{a.label}</td>
-                    <td className='p-2 text-right tabular-nums font-semibold text-gray-100'>
-                      {a.value.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className='rounded-lg border border-white/10 bg-white/5 p-3'>
-          <div className='flex items-start justify-between gap-2'>
-            <div>
-              <div className='text-xs sm:text-sm font-semibold text-gray-200'>Sleeper Data</div>
-            </div>
-          </div>
-          {/*
-            TODO: Sleeper data trajectory chart is temporarily disabled.
-            The upstream trajectory values are not yet stable (net duplication / per-team mapping issues).
-          */}
-          <div className='mt-2 text-xs sm:text-sm text-gray-300'>
-            {props.data.sleeper_data.positional_impact}
-          </div>
-          <ul className='mt-2 list-disc pl-5 text-xs sm:text-sm text-gray-300 space-y-1'>
-            {props.data.sleeper_data.needs_addressed.map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-}
 

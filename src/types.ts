@@ -37,6 +37,8 @@ export interface DashboardPickRow {
 export interface TradeAnalyzerPick {
     pick_id?: string;
     owner_roster_id: number;
+    /** Sleeper roster that originally held this pick slot (before trades). */
+    original_roster_id?: number;
     season: number;
     round: number;
     descriptor?: 'early' | 'mid' | 'late' | string;
@@ -111,6 +113,46 @@ export interface TradeAnalyzerLastResultRow {
     createdAt: number;
     request: TradeAnalyzerRequest;
     response: TradeAnalyzerResponse;
+}
+
+/** Serializable player row stored with a trade analysis history entry. */
+export interface TradeAnalyzerPlayerSnapshot {
+    player_id: string;
+    name: string;
+    position?: string;
+    ktc_value: number;
+    rank_label: string | null;
+}
+
+export interface TradeAnalyzerPickSnapshot {
+    pick_id?: string;
+    label: string;
+    ktc_value: number;
+}
+
+export interface TradeAnalyzerSideSnapshot {
+    roster_id: number;
+    team_name: string;
+    team_subtitle: string;
+    players: TradeAnalyzerPlayerSnapshot[];
+    picks: TradeAnalyzerPickSnapshot[];
+    ktc_subtotal: number;
+}
+
+export interface TradeAnalyzerHistoryEntry {
+    id: string;
+    createdAt: number;
+    league_id: string;
+    additional_context?: string;
+    request: TradeAnalyzerRequest;
+    response: TradeAnalyzerResponse;
+    side_a: TradeAnalyzerSideSnapshot;
+    side_b: TradeAnalyzerSideSnapshot;
+}
+
+export interface TradeAnalyzerHistoryRow {
+    key: 'trade_analyzer_history';
+    entries: TradeAnalyzerHistoryEntry[];
 }
 
 // ============================================================================
@@ -377,7 +419,8 @@ export interface AppPrefLeagueId {
 export type AppPrefRow =
     | AppPrefLeagueId
     | TradeAnalyzerPrefsRow
-    | TradeAnalyzerLastResultRow;
+    | TradeAnalyzerLastResultRow
+    | TradeAnalyzerHistoryRow;
 
 export interface PlayerDBSchema extends DBSchema {
     players: {
