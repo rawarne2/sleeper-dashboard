@@ -1,5 +1,3 @@
-import { tradeGradeBorderClass, tradeGradeColorClass } from './tradeGrades';
-
 export function tradeAssetBorder(): string {
   return 'border-gray-500';
 }
@@ -138,8 +136,6 @@ export function KtcTradeComparison(props: {
   sideBValue: number;
   sideAAssets: TradeAssetRow[];
   sideBAssets: TradeAssetRow[];
-  sideAGrade?: string;
-  sideBGrade?: string;
 }) {
   const a = Math.max(0, props.sideAValue);
   const b = Math.max(0, props.sideBValue);
@@ -156,15 +152,8 @@ export function KtcTradeComparison(props: {
     <div className='space-y-4'>
       <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
         <div>
-          <div className='flex items-center gap-2 rounded-t-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-gray-100 sm:text-sm'>
+          <div className='rounded-t-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-gray-100 sm:text-sm'>
             {props.sideALabel} gets…
-            {props.sideAGrade ? (
-              <span
-                className={`inline-flex min-w-[2.25rem] items-center justify-center rounded-md border px-2 py-0.5 text-xs font-bold tabular-nums ${tradeGradeBorderClass(props.sideAGrade)} ${tradeGradeColorClass(props.sideAGrade)}`}
-              >
-                {props.sideAGrade}
-              </span>
-            ) : null}
           </div>
           <div className='space-y-2 rounded-b-md border border-t-0 border-white/10 bg-black/20 p-2'>
             {props.sideAAssets.length === 0 ? (
@@ -182,15 +171,8 @@ export function KtcTradeComparison(props: {
           </div>
         </div>
         <div>
-          <div className='flex items-center gap-2 rounded-t-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-gray-100 sm:text-sm'>
+          <div className='rounded-t-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-gray-100 sm:text-sm'>
             {props.sideBLabel} gets…
-            {props.sideBGrade ? (
-              <span
-                className={`inline-flex min-w-[2.25rem] items-center justify-center rounded-md border px-2 py-0.5 text-xs font-bold tabular-nums ${tradeGradeBorderClass(props.sideBGrade)} ${tradeGradeColorClass(props.sideBGrade)}`}
-              >
-                {props.sideBGrade}
-              </span>
-            ) : null}
           </div>
           <div className='space-y-2 rounded-b-md border border-t-0 border-white/10 bg-black/20 p-2'>
             {props.sideBAssets.length === 0 ? (

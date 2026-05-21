@@ -1002,8 +1002,8 @@ export const TradeAnalyzerPage: React.FC = () => {
           />
         </div>
 
-        <div className='mt-3 rounded-xl border border-white/10 bg-black/10 p-3 sm:p-4'>
-          <div className='flex items-center justify-between gap-3'>
+        <div className='mt-3 rounded-xl border border-white/10 bg-black/10 p-2 sm:p-3'>
+          <div className='flex items-center justify-between gap-2'>
             <label className='text-xs sm:text-sm font-semibold text-gray-200' htmlFor='trade-analyzer-context'>
               Additional context
             </label>
@@ -1013,11 +1013,12 @@ export const TradeAnalyzerPage: React.FC = () => {
           </div>
           <textarea
             id='trade-analyzer-context'
+            rows={3}
             value={state.context}
             disabled={!isReady}
             onChange={(ev) => dispatch({ type: 'setContext', value: ev.target.value })}
             placeholder='Optional: injuries, timeline, league context…'
-            className='mt-2 w-full min-h-[110px] resize-y rounded-lg border border-white/10 bg-[#0b1624] px-3 py-2.5 text-xs sm:text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main disabled:opacity-60'
+            className='mt-1.5 w-full min-h-16 resize-y rounded-lg border border-white/10 bg-[#0b1624] px-2.5 py-2 text-xs sm:text-sm text-gray-100 placeholder:text-gray-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main disabled:opacity-60'
           />
         </div>
 

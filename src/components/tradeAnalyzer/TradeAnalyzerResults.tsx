@@ -194,8 +194,6 @@ export function AnalysisResultsPanel(props: {
             sideBValue={entry.side_a.ktc_subtotal}
             sideAAssets={sideAReceives}
             sideBAssets={sideBReceives}
-            sideAGrade={gradeA}
-            sideBGrade={gradeB}
           />
         </div>
       </div>
