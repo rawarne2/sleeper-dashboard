@@ -20,6 +20,7 @@ import {
   analyzeTrade,
   canonicalPickId,
   fetchTradeAnalyzerProviders,
+  pickAssetKey,
   type TradeAnalyzerError,
 } from '../services/tradeAnalyzer';
 import {
@@ -36,6 +37,7 @@ import {
   AnalysisResultsPanel,
   RecentTradeAnalysesSection,
 } from '../components/tradeAnalyzer/TradeAnalyzerResults';
+import { PlayerDetailModal } from '../components/PlayerDetailModal';
 import {
   buildModelSelectOptions,
   toneForSide,
@@ -60,6 +62,7 @@ type SelectedAsset = SelectedPlayer | SelectedPick;
 type SideState = {
   rosterId: number | null;
   assets: SelectedAsset[];
+  isTanking: boolean;
 };
 
 type ResultsState = { status: 'idle' } | { status: 'loading' } | { status: 'ready' };
@@ -81,6 +84,7 @@ type Action =
   | { type: 'togglePlayer'; side: SideKey; playerId: string }
   | { type: 'togglePick'; side: SideKey; pickKey: string }
   | { type: 'clearSideAssets'; side: SideKey }
+  | { type: 'setTanking'; side: SideKey; value: boolean }
   | { type: 'setContext'; value: string }
   | { type: 'setActiveSide'; side: SideKey }
   | { type: 'analyzeStart' }
@@ -111,19 +115,34 @@ function uniqAssets(assets: SelectedAsset[]): SelectedAsset[] {
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'setRoster': {
-      const nextSide: SideState = { rosterId: action.rosterId, assets: [] };
+      const prevSide = action.side === 'a' ? state.sideA : state.sideB;
+      const nextSide: SideState = {
+        rosterId: action.rosterId,
+        assets: [],
+        // Preserve user's tanking choice across roster changes — they're describing the team's posture, not the trade.
+        isTanking: prevSide.isTanking,
+      };
       if (action.side === 'a') {
         const sideB =
           state.sideB.rosterId === action.rosterId
-            ? { rosterId: null, assets: [] }
+            ? { rosterId: null, assets: [], isTanking: state.sideB.isTanking }
             : state.sideB;
         return { ...state, sideA: nextSide, sideB };
       }
       const sideA =
         state.sideA.rosterId === action.rosterId
-          ? { rosterId: null, assets: [] }
+          ? { rosterId: null, assets: [], isTanking: state.sideA.isTanking }
           : state.sideA;
       return { ...state, sideB: nextSide, sideA };
+    }
+    case 'setTanking': {
+      const nextSide: SideState =
+        action.side === 'a'
+          ? { ...state.sideA, isTanking: action.value }
+          : { ...state.sideB, isTanking: action.value };
+      return action.side === 'a'
+        ? { ...state, sideA: nextSide }
+        : { ...state, sideB: nextSide };
     }
     case 'togglePlayer': {
       const side = action.side === 'a' ? state.sideA : state.sideB;
@@ -191,8 +210,8 @@ function reducer(state: State, action: Action): State {
     }
     case 'resetAll': {
       return {
-        sideA: { rosterId: null, assets: [] },
-        sideB: { rosterId: null, assets: [] },
+        sideA: { rosterId: null, assets: [], isTanking: false },
+        sideB: { rosterId: null, assets: [], isTanking: false },
         context: '',
         activeSide: 'a',
         results: { status: 'idle' },
@@ -230,29 +249,18 @@ function groupPlayersByPosition(players: Player[]): PlayerGroup[] {
     arr.push(p);
     byPos.set(pos, arr);
   }
-  const sortName = (a: Player, b: Player) =>
-    `${a.first_name ?? ''} ${a.last_name ?? ''}`.localeCompare(
-      `${b.first_name ?? ''} ${b.last_name ?? ''}`
-    );
+  const sortKtc = (a: Player, b: Player) => ktcValueForPlayer(b) - ktcValueForPlayer(a);
   const groups: PlayerGroup[] = [];
   for (const pos of order) {
     const arr = byPos.get(pos);
     if (!arr || arr.length === 0) continue;
-    groups.push({ label: pos, players: [...arr].sort(sortName) });
+    groups.push({ label: pos, players: [...arr].sort(sortKtc) });
     byPos.delete(pos);
   }
   for (const [pos, arr] of byPos.entries()) {
-    groups.push({ label: pos, players: [...arr].sort(sortName) });
+    groups.push({ label: pos, players: [...arr].sort(sortKtc) });
   }
   return groups;
-}
-
-function sortPlayersByName(players: Player[]): Player[] {
-  return [...players].sort((a, b) =>
-    `${a.first_name ?? ''} ${a.last_name ?? ''}`.localeCompare(
-      `${b.first_name ?? ''} ${b.last_name ?? ''}`
-    )
-  );
 }
 
 /** Production lock: show all providers but only Gemini is selectable. */
@@ -322,22 +330,9 @@ function inferAiRoutingDevChoice(args: {
   return { serviceLabel: row.provider || key, modelLabel };
 }
 
-function pickKey(p: TradeAnalyzerPick): string {
-  if (p.pick_id?.trim()) return p.pick_id.trim();
-  return `${p.owner_roster_id}_${p.season}_${p.round}_${String(p.descriptor ?? '')}`;
-}
-
-function pickLabel(p: TradeAnalyzerPick, ownerRosterId: number): string {
+function pickLabel(p: TradeAnalyzerPick): string {
   const d = (p.descriptor || '').trim();
-  const base = `${p.season} Round ${p.round}${d ? ` (${d})` : ''}`;
-  if (
-    p.original_roster_id != null &&
-    Number.isFinite(p.original_roster_id) &&
-    p.original_roster_id !== ownerRosterId
-  ) {
-    return `${base} (from R${p.original_roster_id})`;
-  }
-  return base;
+  return `${p.season} Round ${p.round}${d ? ` (${d})` : ''}`;
 }
 
 /** Owned picks for a roster from the dashboard bundle (`picks_by_roster`). */
@@ -358,7 +353,7 @@ function picksAvailableToAdd(
   return ownedPicksForRoster(rosterId, picksByRosterId).filter((p) => {
     if (!p.pick_id?.trim()) return false;
     if (p.owner_roster_id !== rosterId) return false;
-    return !selectedPickKeys.has(pickKey(p));
+    return !selectedPickKeys.has(pickAssetKey(p));
   });
 }
 
@@ -376,10 +371,15 @@ export const TradeAnalyzerPage: React.FC = () => {
     loading,
     teamsData,
     players,
+    playerOwnership,
     league,
     tradePicksByRoster,
     selectedLeagueId,
+    bundleSeason,
+    researchMeta,
   } = useLeague();
+  const leagueSeason = league?.season != null ? String(league.season) : null;
+  const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
   const tradeAnalysisSeason = useMemo(
     () => resolveTradeAnalyzerSeason(league, selectedLeagueId),
     [league, selectedLeagueId]
@@ -409,8 +409,8 @@ export const TradeAnalyzerPage: React.FC = () => {
     : false;
 
   const [state, dispatch] = useReducer(reducer, {
-    sideA: { rosterId: null, assets: [] },
-    sideB: { rosterId: null, assets: [] },
+    sideA: { rosterId: null, assets: [], isTanking: false },
+    sideB: { rosterId: null, assets: [], isTanking: false },
     context: '',
     activeSide: 'a',
     results: { status: 'idle' },
@@ -673,12 +673,12 @@ export const TradeAnalyzerPage: React.FC = () => {
   );
 
   const sideASelectedPicks = useMemo(
-    () => sideAOwnedPicks.filter((p) => sideASelectedPickKeys.has(pickKey(p))),
+    () => sideAOwnedPicks.filter((p) => sideASelectedPickKeys.has(pickAssetKey(p))),
     [sideAOwnedPicks, sideASelectedPickKeys]
   );
 
   const sideBSelectedPicks = useMemo(
-    () => sideBOwnedPicks.filter((p) => sideBSelectedPickKeys.has(pickKey(p))),
+    () => sideBOwnedPicks.filter((p) => sideBSelectedPickKeys.has(pickAssetKey(p))),
     [sideBOwnedPicks, sideBSelectedPickKeys]
   );
 
@@ -738,7 +738,7 @@ export const TradeAnalyzerPage: React.FC = () => {
 
   return (
     <div className='w-full'>
-      <div ref={builderRef} className='rounded-xl border border-white/10 bg-[#0d1e2e] p-4 sm:p-5'>
+      <div ref={builderRef} className='rounded-xl border border-white/10 bg-[#0d1e2e] p-3 sm:p-4'>
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div>
             <div className='flex items-center gap-2'>
@@ -913,7 +913,9 @@ export const TradeAnalyzerPage: React.FC = () => {
 
         <div className='mt-3 grid grid-cols-1 gap-4 md:grid-cols-2'>
           <SideCard
-            title='Side A'
+            title={
+              sideATeam ? teamDisplayName(sideATeam) : 'Team 1'
+            }
             side='a'
             disabled={!isReady}
             teams={teamsData}
@@ -927,14 +929,19 @@ export const TradeAnalyzerPage: React.FC = () => {
             picksToAdd={sideAPicksToAdd}
             ownedPickCount={sideAOwnedPicks.length}
             selectedPickKeys={sideASelectedPickKeys}
+            isTanking={state.sideA.isTanking}
             onActive={() => dispatch({ type: 'setActiveSide', side: 'a' })}
             onRosterChange={(rid) => dispatch({ type: 'setRoster', side: 'a', rosterId: rid })}
             onTogglePlayer={(pid) => dispatch({ type: 'togglePlayer', side: 'a', playerId: pid })}
             onTogglePick={(key) => dispatch({ type: 'togglePick', side: 'a', pickKey: key })}
+            onTankingChange={(value) => dispatch({ type: 'setTanking', side: 'a', value })}
             onClear={() => dispatch({ type: 'clearSideAssets', side: 'a' })}
+            onOpenPlayerDetail={setDetailPlayer}
           />
           <SideCard
-            title='Side B'
+            title={
+              sideBTeam ? teamDisplayName(sideBTeam) : 'Team 2'
+            }
             side='b'
             disabled={!isReady}
             teams={teamsData}
@@ -948,11 +955,14 @@ export const TradeAnalyzerPage: React.FC = () => {
             picksToAdd={sideBPicksToAdd}
             ownedPickCount={sideBOwnedPicks.length}
             selectedPickKeys={sideBSelectedPickKeys}
+            isTanking={state.sideB.isTanking}
             onActive={() => dispatch({ type: 'setActiveSide', side: 'b' })}
             onRosterChange={(rid) => dispatch({ type: 'setRoster', side: 'b', rosterId: rid })}
             onTogglePlayer={(pid) => dispatch({ type: 'togglePlayer', side: 'b', playerId: pid })}
             onTogglePick={(key) => dispatch({ type: 'togglePick', side: 'b', pickKey: key })}
+            onTankingChange={(value) => dispatch({ type: 'setTanking', side: 'b', value })}
             onClear={() => dispatch({ type: 'clearSideAssets', side: 'b' })}
+            onOpenPlayerDetail={setDetailPlayer}
           />
         </div>
 
@@ -999,11 +1009,13 @@ export const TradeAnalyzerPage: React.FC = () => {
                   roster_id: state.sideA.rosterId ?? 0,
                   player_ids: playerIdsFrom(sideASelectedPlayers),
                   pick_ids: sideASelectedPicks.map((p) => canonicalPickId(p)),
+                  is_tanking: state.sideA.isTanking,
                 },
                 side_b: {
                   roster_id: state.sideB.rosterId ?? 0,
                   player_ids: playerIdsFrom(sideBSelectedPlayers),
                   pick_ids: sideBSelectedPicks.map((p) => canonicalPickId(p)),
+                  is_tanking: state.sideB.isTanking,
                 },
                 additional_context: state.context.trim() || undefined,
               };
@@ -1107,6 +1119,17 @@ export const TradeAnalyzerPage: React.FC = () => {
         />
       ) : null}
 
+      {detailPlayer ? (
+        <PlayerDetailModal
+          player={detailPlayer}
+          bundleSeason={bundleSeason}
+          leagueSeason={leagueSeason}
+          researchWeek={researchMeta?.week ?? null}
+          ownershipMap={playerOwnership}
+          onClose={() => setDetailPlayer(null)}
+        />
+      ) : null}
+
     </div>
   );
 };
@@ -1126,11 +1149,14 @@ function SideCard(props: {
   selectedPicks: TradeAnalyzerPick[];
   subtotal: number;
   otherSubtotal: number;
+  isTanking: boolean;
   onActive: () => void;
   onRosterChange: (rosterId: number | null) => void;
   onTogglePlayer: (playerId: string) => void;
   onTogglePick: (pickKey: string) => void;
+  onTankingChange: (value: boolean) => void;
   onClear: () => void;
+  onOpenPlayerDetail: (player: Player) => void;
 }) {
   const selectedTeam =
     props.selectedRosterId != null
@@ -1139,7 +1165,7 @@ function SideCard(props: {
 
   const groupedPlayers = useMemo(() => {
     if (!selectedTeam) return [];
-    return groupPlayersByPosition(sortPlayersByName(selectedTeam.players));
+    return groupPlayersByPosition(selectedTeam.players);
   }, [selectedTeam]);
 
   const valueTone = toneForSide(props.subtotal, props.otherSubtotal);
@@ -1166,13 +1192,13 @@ function SideCard(props: {
         </button>
       </div>
 
-      <div className='mt-3'>
+      <div className='mt-2'>
         <label className='block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-gray-400'>
           Team
         </label>
         <select
           disabled={props.disabled}
-          className='mt-1 w-full rounded-lg border border-white/10 bg-[#0b1624] px-3 py-2.5 text-xs sm:text-sm text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main disabled:opacity-60'
+          className='mt-1 w-full rounded-lg border border-white/10 bg-[#0b1624] px-3 py-2 text-xs sm:text-sm text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main disabled:opacity-60'
           value={props.selectedRosterId ?? ''}
           onChange={(ev) => {
             const v = ev.target.value;
@@ -1209,7 +1235,7 @@ function SideCard(props: {
                   </div>
                 )}
               </div>
-              <div className='min-w-0'>
+              <div className='min-w-0 flex-1'>
                 <div className='truncate text-xs sm:text-sm font-semibold text-gray-100'>
                   {teamDisplayName(selectedTeam)}
                 </div>
@@ -1217,87 +1243,61 @@ function SideCard(props: {
                   {teamSubtitle(selectedTeam)}
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div className='mt-3'>
-            <div className='flex items-center justify-between gap-2'>
-              <div className='text-xs font-semibold text-gray-200 sm:text-sm'>Trading away</div>
               <div
-                className={`text-base font-bold tabular-nums sm:text-lg ${tradeValueToneClass(valueTone)}`}
+                className='posture-toggle-group'
+                role='radiogroup'
+                aria-label={`${props.title} posture`}
               >
-                {props.subtotal.toLocaleString()}
-              </div>
-            </div>
-            {props.selectedPlayers.length === 0 && props.selectedPicks.length === 0 ? (
-              <div className='mt-2 text-xs text-gray-400 sm:text-sm'>No assets yet.</div>
-            ) : (
-              <div className='mt-2 space-y-2'>
-                {props.selectedPlayers.map((p) => {
-                  const name = playerDisplayName(p);
-                  const ktc = ktcValueForPlayer(p);
+                {(['contending', 'tanking'] as const).map((value) => {
+                  const active = props.isTanking === (value === 'tanking');
                   return (
-                    <TradeAssetTag
-                      key={p.player_id}
-                      asset={{
-                        key: p.player_id ?? name,
-                        name,
-                        position: p.position,
-                        ktc,
-                        rankLabel: playerRankLabel(p),
-                      }}
-                      valueTone={valueTone}
-                      onRemove={() => p.player_id && props.onTogglePlayer(p.player_id)}
-                      removeLabel={`Remove ${name} from ${props.title}`}
-                    />
-                  );
-                })}
-                {props.selectedPicks.map((p) => {
-                  const key = pickKey(p);
-                  const label = pickLabel(p, props.selectedRosterId ?? p.owner_roster_id);
-                  const ktc = p.ktc_value ?? 0;
-                  return (
-                    <TradeAssetTag
-                      key={key}
-                      isPick
-                      asset={{
-                        key,
-                        name: label,
-                        ktc,
-                        rankLabel: null,
-                      }}
-                      valueTone={valueTone}
-                      onRemove={() => props.onTogglePick(key)}
-                      removeLabel={`Remove ${label} from ${props.title}`}
-                    />
+                    <button
+                      key={value}
+                      type='button'
+                      role='radio'
+                      aria-checked={active}
+                      disabled={props.disabled}
+                      onClick={() => props.onTankingChange(value === 'tanking')}
+                      className={
+                        active ? 'posture-toggle posture-toggle--active' : 'posture-toggle'
+                      }
+                    >
+                      {value === 'tanking' ? 'Tanking' : 'Contending'}
+                    </button>
                   );
                 })}
               </div>
-            )}
-          </div>
-
-
-          <div className='mt-4 rounded-lg border border-white/10 bg-white/5 p-3'>
-            <div className='text-xs sm:text-sm font-semibold text-gray-200'>
-              Add players
             </div>
             <div className='mt-2'>
+              <label
+                htmlFor={`trade-side-${props.side}-asset-select`}
+                className='sr-only'
+              >
+                Add player or pick to {props.title}
+              </label>
               <select
-                id={`trade-side-${props.side}-player-select`}
-                aria-label={`Add player to ${props.title}`}
+                id={`trade-side-${props.side}-asset-select`}
+                aria-label={`Add player or pick to ${props.title}`}
                 disabled={props.disabled}
-                className='mt-1 w-full rounded-lg border border-white/10 bg-[#0b1624] px-3 py-2.5 text-xs sm:text-sm text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main disabled:opacity-60'
+                className='w-full rounded-lg border border-white/10 bg-[#0b1624] px-3 py-2 text-xs sm:text-sm text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main disabled:opacity-60'
                 value=''
                 onChange={(ev) => {
-                  const id = ev.target.value;
-                  if (!id) return;
-                  if (!props.selectedPlayerIds.has(id)) {
-                    props.onTogglePlayer(id);
+                  const v = ev.target.value;
+                  if (!v) return;
+                  if (v.startsWith('pick:')) {
+                    const key = v.slice(5);
+                    const allowed = new Set(props.picksToAdd.map((p) => pickAssetKey(p)));
+                    if (allowed.has(key)) props.onTogglePick(key);
+                  } else if (v.startsWith('player:')) {
+                    const id = v.slice(7);
+                    if (id && !props.selectedPlayerIds.has(id)) {
+                      props.onTogglePlayer(id);
+                    }
                   }
                   ev.currentTarget.value = '';
                 }}
               >
-                <option value=''>Select a player to add</option>
+                <option value=''>Add player or draft pick…</option>
                 {groupedPlayers.map((g) => (
                   <optgroup key={g.label} label={g.label}>
                     {g.players.map((p) => {
@@ -1308,63 +1308,103 @@ function SideCard(props: {
                       const already = props.selectedPlayerIds.has(id);
                       const label = ktc > 0 ? `${name} (${ktc})` : name;
                       return (
-                        <option key={id} value={id} disabled={already}>
+                        <option
+                          key={id}
+                          value={`player:${id}`}
+                          disabled={already}
+                        >
                           {label}
                         </option>
                       );
                     })}
                   </optgroup>
                 ))}
+                {props.ownedPickCount > 0 && props.picksToAdd.length > 0 ? (
+                  <optgroup label='Draft picks'>
+                    {props.picksToAdd.map((p) => {
+                      const assetKey = pickAssetKey(p);
+                      const label = pickLabel(p);
+                      const ktc = p.ktc_value ?? 0;
+                      return (
+                        <option key={assetKey} value={`pick:${assetKey}`}>
+                          {ktc ? `${label} (${ktc})` : label}
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                ) : null}
               </select>
+              {props.ownedPickCount === 0 ? (
+                <p className='mt-1.5 text-xs text-gray-400 sm:text-sm'>
+                  No owned draft picks for this team yet. Refresh league data from Sleeper
+                  so traded picks sync, then reload the dashboard.
+                </p>
+              ) : null}
             </div>
           </div>
 
-          <div className='mt-3 rounded-lg border border-white/10 bg-white/5 p-3'>
-            <div className='text-xs sm:text-sm font-semibold text-gray-200'>Add picks</div>
-            {props.ownedPickCount === 0 ? (
-              <div className='mt-2 text-xs sm:text-sm text-gray-400'>
-                No owned draft picks for this team yet. Refresh league data from Sleeper
-                so traded picks sync, then reload the dashboard.
+          <div className='mt-3'>
+            <div className='flex items-center justify-between gap-2'>
+              <div className='text-base font-semibold text-gray-100 sm:text-lg'>
+                Trading away
               </div>
-            ) : props.picksToAdd.length === 0 ? (
-              <div className='mt-2 text-xs sm:text-sm text-gray-400'>
-                All of this team&apos;s owned picks are already in the trade.
+              <div
+                className={`text-lg font-bold tabular-nums sm:text-xl ${tradeValueToneClass(valueTone)}`}
+              >
+                {props.subtotal.toLocaleString()}
               </div>
+            </div>
+            {props.selectedPlayers.length === 0 && props.selectedPicks.length === 0 ? (
+              <div className='mt-2 text-xs text-gray-400 sm:text-sm'>No assets yet.</div>
             ) : (
-              <div className='mt-2'>
-                <select
-                  id={`trade-side-${props.side}-pick-select`}
-                  aria-label={`Add draft pick to ${props.title}`}
-                  disabled={props.disabled}
-                  className='mt-1 w-full rounded-lg border border-white/10 bg-[#0b1624] px-3 py-2.5 text-xs sm:text-sm text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main disabled:opacity-60'
-                  value=''
-                  onChange={(ev) => {
-                    const key = ev.target.value;
-                    if (!key) return;
-                    const allowed = new Set(
-                      props.picksToAdd.map((p) => pickKey(p))
-                    );
-                    if (!allowed.has(key)) return;
-                    props.onTogglePick(key);
-                    ev.currentTarget.value = '';
-                  }}
-                >
-                  <option value=''>Select a pick to add</option>
-                  {props.picksToAdd.map((p) => {
-                    const key = pickKey(p);
-                    const rid = props.selectedRosterId ?? p.owner_roster_id;
-                    const label = pickLabel(p, rid);
-                    const ktc = p.ktc_value ?? 0;
-                    return (
-                      <option key={key} value={key}>
-                        {ktc ? `${label} (${ktc})` : label}
-                      </option>
-                    );
-                  })}
-                </select>
+              <div className='mt-2 space-y-1.5'>
+                {props.selectedPlayers.map((p) => {
+                  const name = playerDisplayName(p);
+                  const ktc = ktcValueForPlayer(p);
+                  return (
+                    <TradeAssetTag
+                      key={p.player_id}
+                      showPosition={false}
+                      asset={{
+                        key: p.player_id ?? name,
+                        name,
+                        position: p.position,
+                        ktc,
+                        rankLabel: playerRankLabel(p),
+                      }}
+                      valueTone={valueTone}
+                      onRemove={() => p.player_id && props.onTogglePlayer(p.player_id)}
+                      removeLabel={`Remove ${name} from ${props.title}`}
+                      onOpenDetail={() => props.onOpenPlayerDetail(p)}
+                      detailLabel={`View details for ${name}`}
+                    />
+                  );
+                })}
+                {props.selectedPicks.map((p) => {
+                  const assetKey = pickAssetKey(p);
+                  const label = pickLabel(p);
+                  const ktc = p.ktc_value ?? 0;
+                  return (
+                    <TradeAssetTag
+                      key={assetKey}
+                      isPick
+                      asset={{
+                        key: assetKey,
+                        name: label,
+                        ktc,
+                        rankLabel: null,
+                      }}
+                      valueTone={valueTone}
+                      onRemove={() => props.onTogglePick(assetKey)}
+                      removeLabel={`Remove ${label} from ${props.title}`}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
+
+
         </>
       ) : null}
     </div>

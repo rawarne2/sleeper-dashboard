@@ -26,6 +26,21 @@ export interface TeamPanelProps {
   expandedPlayer: string | null;
   onPlayerClick: (id: string) => void;
   playerOwnership: OwnershipMap;
+  bundleSeason: string | null;
+  leagueSeason: string | null;
+  researchWeek: number | null;
+  ktcLastUpdated: string | null;
+}
+
+function formatKtcLastUpdated(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 export const TeamPanel = memo(({
@@ -38,9 +53,15 @@ export const TeamPanel = memo(({
   expandedPlayer,
   onPlayerClick,
   playerOwnership,
+  bundleSeason,
+  leagueSeason,
+  researchWeek,
+  ktcLastUpdated,
 }: TeamPanelProps) => {
-  const { roster, user, starters, bench, reserve } = teamData;
+  const { roster, user, starters, bench, reserve, taxi } = teamData;
   const s = roster.settings;
+  const ktcUpdatedLabel = formatKtcLastUpdated(ktcLastUpdated);
+  const researchSeason = bundleSeason ?? leagueSeason ?? null;
   const isChampion = !!champId && user.user_id === champId;
 
   const diff = Number(getPF(s)) - Number(getPA(s));
@@ -157,14 +178,40 @@ export const TeamPanel = memo(({
                 </p>
               </div>
             ) : (
-              <RosterTable
-                starters={starters}
-                bench={bench}
-                reserve={reserve}
-                expandedPlayer={expandedPlayer}
-                onPlayerClick={onPlayerClick}
-                playerOwnership={playerOwnership}
-              />
+              <>
+                <div className='flex flex-wrap items-center gap-x-3 gap-y-1 pb-2 text-xs text-gray-400'>
+                  <span>
+                    Rankings:{' '}
+                    <span className='text-gray-200'>Superflex · Dynasty · TEP</span>
+                  </span>
+                  {researchWeek != null && researchSeason && (
+                    <span>
+                      Market data:{' '}
+                      <span className='text-gray-200'>
+                        Week {researchWeek} · {researchSeason}
+                      </span>
+                    </span>
+                  )}
+                  {ktcUpdatedLabel && (
+                    <span>
+                      KTC updated:{' '}
+                      <span className='text-gray-200'>{ktcUpdatedLabel}</span>
+                    </span>
+                  )}
+                </div>
+                <RosterTable
+                  starters={starters}
+                  bench={bench}
+                  reserve={reserve}
+                  taxi={taxi}
+                  expandedPlayer={expandedPlayer}
+                  onPlayerClick={onPlayerClick}
+                  playerOwnership={playerOwnership}
+                  bundleSeason={bundleSeason}
+                  leagueSeason={leagueSeason}
+                  researchWeek={researchWeek}
+                />
+              </>
             )}
           </div>
         </>

@@ -1,5 +1,12 @@
 import { IDBPDatabase, IDBPTransaction } from 'idb';
-import { Player, KTCData, PlayerDBSchema, PlayerStats } from './types';
+import {
+    KTCData,
+    KTCValues,
+    Player,
+    PlayerDBSchema,
+    PlayerStats,
+    ResearchLatest,
+} from './types';
 
 interface BackendPlayer {
     sleeper_player_id?: string;
@@ -16,8 +23,14 @@ interface BackendPlayer {
     depth_chart_position?: number;
     status?: string;
     injury_status?: string | null;
+    injury_body_part?: string | null;
+    injury_notes?: string | null;
+    injury_start_date?: string | null;
+    practice_participation?: string | null;
+    practice_description?: string | null;
     ktc?: KTCData & { age?: number };
     stats?: PlayerStats;
+    research_latest?: ResearchLatest | null;
 }
 
 const RELEVANT_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K']);
@@ -44,11 +57,46 @@ export function mapBackendPlayerRow(player: BackendPlayer): Player | null {
         fantasy_positions: [player.position || ''],
         status: player.status || 'Active',
         injury_status: player.injury_status ?? null,
+        injury_body_part: player.injury_body_part ?? null,
+        injury_notes: player.injury_notes ?? null,
+        injury_start_date: player.injury_start_date ?? null,
+        practice_participation: player.practice_participation ?? null,
+        practice_description: player.practice_description ?? null,
         number: player.number,
         depth_chart_position: player.depth_chart_position,
         ktc: player.ktc,
         stats: player.stats,
+        research_latest: player.research_latest ?? null,
     };
+}
+
+/** TEP-hoisted KTC values for the dashboard row (value, rank, tiers). */
+export function ktcDisplayValues(player: Player): KTCValues | null {
+    return player.ktc?.superflexValues ?? player.ktc?.oneQBValues ?? null;
+}
+
+/** Stringify a KTC ``injury`` JSON blob for the expand panel. */
+export function formatKtcInjury(injury: unknown): string | null {
+    if (injury == null) return null;
+    if (typeof injury === 'string') return injury;
+    if (typeof injury !== 'object') return String(injury);
+    const obj = injury as Record<string, unknown>;
+    const code = obj.injuryCode ?? obj.code ?? obj.status ?? null;
+    if (typeof code === 'string' && code.trim().length > 0) return code;
+    try {
+        return JSON.stringify(injury);
+    } catch {
+        return null;
+    }
+}
+
+/** Only show bye week when viewing the current bundle season. */
+export function showByeForSeason(
+    bundleSeason: string | null | undefined,
+    leagueSeason: string | null | undefined
+): boolean {
+    if (!bundleSeason) return false;
+    return bundleSeason === (leagueSeason ?? bundleSeason);
 }
 
 export function mapBackendPlayersArrayToRecord(

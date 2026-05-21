@@ -62,7 +62,7 @@ export function buildTradeAnalyzerHistoryEntry(args: {
   sideBPlayers: Player[];
   sideAPicks: TradeAnalyzerPick[];
   sideBPicks: TradeAnalyzerPick[];
-  pickLabel: (p: TradeAnalyzerPick, ownerRosterId: number) => string;
+  pickLabel: (p: TradeAnalyzerPick) => string;
 }): TradeAnalyzerHistoryEntry {
   const side = (
     rosterId: number,
@@ -79,7 +79,7 @@ export function buildTradeAnalyzerHistoryEntry(args: {
     }));
     const pickRows = picks.map((p) => ({
       pick_id: p.pick_id,
-      label: args.pickLabel(p, rosterId),
+      label: args.pickLabel(p),
       ktc_value: p.ktc_value ?? 0,
     }));
     const ktc_subtotal =

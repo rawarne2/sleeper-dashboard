@@ -1,23 +1,5 @@
-/** Position-colored border for trade asset tags (shared builder + results). */
-export function tradeAssetBorder(position?: string, isPick?: boolean): string {
-  if (isPick) return 'border-amber-400';
-  const pos = (position || '').trim().toUpperCase();
-  switch (pos) {
-    case 'QB':
-      return 'border-red-500';
-    case 'RB':
-      return 'border-green-500';
-    case 'WR':
-      return 'border-blue-500';
-    case 'TE':
-      return 'border-amber-500';
-    case 'K':
-      return 'border-purple-500';
-    case 'DEF':
-      return 'border-cyan-500';
-    default:
-      return 'border-gray-500';
-  }
+export function tradeAssetBorder(): string {
+  return 'border-gray-500';
 }
 
 export type TradeValueTone = 'win' | 'lose' | 'even';
@@ -32,8 +14,8 @@ export function toneForSide(
   sideValue: number,
   otherValue: number
 ): TradeValueTone {
-  if (sideValue > otherValue) return 'win';
-  if (sideValue < otherValue) return 'lose';
+  if (sideValue < otherValue) return 'win';
+  if (sideValue > otherValue) return 'lose';
   return 'even';
 }
 
@@ -47,21 +29,28 @@ export type TradeAssetRow = {
 };
 
 const ASSET_TAG_BASE =
-  'box-border flex w-full min-h-11 items-stretch overflow-hidden rounded-md border-2 border-solid bg-white/[0.06] shadow-sm';
+  'box-border flex w-full min-h-11 items-stretch overflow-hidden rounded-md border border-solid bg-white/[0.06] shadow-sm';
 
-/** KTC-style row: name + rank left, large value right. */
 export function TradeAssetTag(props: {
   asset: TradeAssetRow;
   valueTone?: TradeValueTone;
   isPick?: boolean;
+  showPosition?: boolean;
   onRemove?: () => void;
   removeLabel?: string;
+  onOpenDetail?: () => void;
+  detailLabel?: string;
 }) {
   const { asset } = props;
   const tone = props.valueTone ?? 'even';
-  const meta =
-    asset.meta ??
-    ([asset.position, asset.rankLabel].filter(Boolean).join(' · ') || null);
+  const showPosition = props.showPosition !== false;
+  const metaParts = [
+    ...(showPosition && asset.position ? [asset.position] : []),
+    ...(asset.rankLabel ? [asset.rankLabel] : []),
+  ];
+  const meta = asset.meta ?? (metaParts.length > 0 ? metaParts.join(' · ') : null);
+  const borderClass = tradeAssetBorder();
+  const cardClass = `${ASSET_TAG_BASE} ${borderClass}`;
 
   const inner = (
     <>
@@ -74,29 +63,47 @@ export function TradeAssetTag(props: {
         ) : null}
       </div>
       <div
-        className={`flex shrink-0 items-center border-l border-white/10 px-3 py-2 tabular-nums text-xl font-bold sm:text-2xl md:text-3xl ${tradeValueToneClass(tone)}`}
+        className={`flex shrink-0 items-center border-l border-white/10 px-3 py-2 tabular-nums text-base font-bold sm:text-lg ${tradeValueToneClass(tone)}`}
       >
         {asset.ktc > 0 ? asset.ktc.toLocaleString() : '—'}
       </div>
     </>
   );
 
-  if (props.onRemove) {
-    return (
-      <button
-        type='button'
-        className={`${ASSET_TAG_BASE} ${tradeAssetBorder(asset.position, props.isPick)} transition-[filter] hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main`}
-        onClick={props.onRemove}
-        aria-label={props.removeLabel ?? `Remove ${asset.name}`}
-      >
-        {inner}
-      </button>
-    );
+  const interactive = props.onOpenDetail != null;
+  const body = interactive ? (
+    <button
+      type='button'
+      className={`${cardClass} w-full overflow-hidden transition-[filter] hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main`}
+      onClick={props.onOpenDetail}
+      aria-label={props.detailLabel ?? `View details for ${asset.name}`}
+    >
+      {inner}
+    </button>
+  ) : (
+    <div className={`${cardClass} overflow-hidden`}>{inner}</div>
+  );
+
+  if (!props.onRemove && !interactive) {
+    return body;
   }
 
   return (
-    <div className={`${ASSET_TAG_BASE} ${tradeAssetBorder(asset.position, props.isPick)}`}>
-      {inner}
+    <div className='relative w-full'>
+      {props.onRemove ? (
+        <button
+          type='button'
+          className='absolute -top-2 -right-2 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-gray-500! text-xs font-bold leading-none text-gray-100 ring-1 ring-white/15 transition-colors hover:bg-gray-400! focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main'
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onRemove?.();
+          }}
+          aria-label={props.removeLabel ?? `Remove ${asset.name}`}
+        >
+          <span aria-hidden>×</span>
+        </button>
+      ) : null}
+      {body}
     </div>
   );
 }
@@ -136,8 +143,8 @@ export function KtcTradeComparison(props: {
   const b = Math.max(0, props.sideBValue);
   const total = a + b || 1;
   const aShare = (a / total) * 100;
-  const toneA = toneForSide(a, b);
-  const toneB = toneForSide(b, a);
+  const toneA = toneForSide(b, a);
+  const toneB = toneForSide(a, b);
   const diff = Math.abs(a - b);
   const favorsA = a > b;
   const favorsB = b > a;
@@ -188,7 +195,11 @@ export function KtcTradeComparison(props: {
         </div>
       </div>
 
-      <div className='relative h-5 overflow-hidden rounded-sm bg-rose-950/40 sm:h-6'>
+      <div
+        className='relative h-6 overflow-hidden rounded-sm bg-rose-950/40 sm:h-7'
+        role='img'
+        aria-label={`${props.sideALabel} ${a.toLocaleString()} KTC versus ${props.sideBLabel} ${b.toLocaleString()} KTC`}
+      >
         <div
           className={`absolute inset-y-0 left-0 ${favorsA ? 'bg-green-600/85' : favorsB ? 'bg-red-600/85' : 'bg-gray-500/70'}`}
           style={{ width: `${aShare}%` }}
@@ -198,9 +209,21 @@ export function KtcTradeComparison(props: {
           className='pointer-events-none absolute inset-y-0 left-1/2 z-10 w-1.5 -translate-x-1/2 border-x border-dashed border-gray-400/90 bg-gray-900/50'
           aria-hidden
         />
+        <span
+          className='pointer-events-none absolute inset-y-0 left-1 z-20 flex max-w-[45%] items-center truncate px-1 text-[10px] font-bold tabular-nums text-white drop-shadow sm:text-xs'
+          title={`${props.sideALabel}: ${a.toLocaleString()} KTC`}
+        >
+          {a.toLocaleString()}
+        </span>
+        <span
+          className='pointer-events-none absolute inset-y-0 right-1 z-20 flex max-w-[45%] items-center justify-end truncate px-1 text-[10px] font-bold tabular-nums text-white drop-shadow sm:text-xs'
+          title={`${props.sideBLabel}: ${b.toLocaleString()} KTC`}
+        >
+          {b.toLocaleString()}
+        </span>
       </div>
 
-      <div className='rounded-md border border-rose-900/35 bg-rose-950/25 px-3 py-3 sm:px-4'>
+      <div className='rounded-md border border-rose-900/35 bg-rose-950/25 px-3 py-3 text-center sm:px-4'>
         {even ? (
           <p className='text-sm font-semibold text-gray-200 sm:text-base'>Even on KTC value</p>
         ) : favorsA ? (
@@ -235,7 +258,6 @@ export function KtcTradeComparison(props: {
   );
 }
 
-/** Model dropdown options: server default once, no duplicate explicit entry. */
 export function buildModelSelectOptions(
   selectableModels: string[],
   serverDefault: string

@@ -20,7 +20,7 @@ import {
   DashboardLeagueBundle,
   TradeAnalyzerPick,
 } from './types';
-import { storePlayers, playersFromDashboardBundle } from './playerFunctions';
+import { ktcDisplayValues, storePlayers, playersFromDashboardBundle } from './playerFunctions';
 import { API_CONFIG, buildApiUrl } from './apiConfig';
 import { LeagueContext } from './leagueContextValue';
 import {
@@ -48,6 +48,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     Map<number, TradeAnalyzerPick[]>
   >(() => new Map());
   const [researchMeta, setResearchMeta] = useState<ResearchMeta | null>(null);
+  const [bundleSeason, setBundleSeason] = useState<string | null>(null);
   const [ktcLastUpdated, setKtcLastUpdated] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -125,6 +126,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     setTradePicksByRoster(new Map());
     setLeague(null);
     setResearchMeta(null);
+    setBundleSeason(null);
     setKtcLastUpdated(null);
     setError(null);
     void (async () => {
@@ -227,6 +229,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       setUsers(data.users);
       setLeague(data.league ?? null);
       setResearchMeta(data.researchMeta ?? null);
+      setBundleSeason(data.bundleSeason ?? data.league?.season ?? null);
       setKtcLastUpdated(data.ktcLastUpdated ?? null);
       setPlayers(playersMap);
       setPlayerOwnership(data.ownership);
@@ -266,6 +269,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       setUsers(data.users);
       setLeague(data.league ?? null);
       setResearchMeta(data.researchMeta ?? null);
+      setBundleSeason(data.bundleSeason ?? data.league?.season ?? null);
       setKtcLastUpdated(data.ktcLastUpdated ?? null);
       setPlayers(playersMap);
       setPlayerOwnership(data.ownership);
@@ -381,19 +385,39 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
         const starterIds = new Set(roster.starters);
         const reserveIds = new Set(roster.reserve || []);
+        const taxiIds = new Set(roster.taxi || []);
 
         const bench = playersList.filter(
           (p) =>
             p.player_id &&
             !starterIds.has(p.player_id) &&
-            !reserveIds.has(p.player_id)
+            !reserveIds.has(p.player_id) &&
+            !taxiIds.has(p.player_id)
         );
 
         const reserve = playersList.filter(
           (p) => p.player_id && reserveIds.has(p.player_id)
         );
 
-        return { roster, user, players: playersList, starters, bench, reserve };
+        const taxi = playersList.filter(
+          (p) => p.player_id && taxiIds.has(p.player_id)
+        );
+
+        const sortByKtcDesc = (list: Player[]) =>
+          [...list].sort(
+            (a, b) =>
+              (ktcDisplayValues(b)?.value ?? 0) - (ktcDisplayValues(a)?.value ?? 0)
+          );
+
+        return {
+          roster,
+          user,
+          players: playersList,
+          starters: sortByKtcDesc(starters),
+          bench: sortByKtcDesc(bench),
+          reserve: sortByKtcDesc(reserve),
+          taxi: sortByKtcDesc(taxi),
+        };
       })
       .sort((a, b) => {
         const aWins = a.roster.settings.wins || 0;
@@ -434,6 +458,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     tradePicksByRoster,
     league,
     researchMeta,
+    bundleSeason,
     ktcLastUpdated,
     championUserId,
     teamsData,

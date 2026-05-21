@@ -60,11 +60,15 @@ export interface TradeAnalyzerRequest {
         roster_id: number;
         player_ids: string[];
         pick_ids: string[];
+        /** Dynasty-only posture override; default false = contending. Ignored in redraft. */
+        is_tanking?: boolean;
     };
     side_b: {
         roster_id: number;
         player_ids: string[];
         pick_ids: string[];
+        /** Dynasty-only posture override; default false = contending. Ignored in redraft. */
+        is_tanking?: boolean;
     };
     ktc?: TradeAnalyzerKtcConfig | null;
     additional_context?: string | null;
@@ -73,10 +77,10 @@ export interface TradeAnalyzerRequest {
 }
 
 export interface TradeAnalyzerResponse {
-    fairness_score: number; // 0-100
     winner: TradeSide | 'even';
     summary_bullets: string[];
     side_a: {
+        trade_grade: string;
         pros: string[];
         cons: string[];
         ktc_delta: {
@@ -187,7 +191,21 @@ export interface KTCValues {
     };
 }
 
-export interface KTCData {
+/** Player-level KTC flags surfaced by the dashboard bundle on each `player.ktc` object. */
+export interface KTCFlags {
+    age?: number;
+    pickRound?: number | null;
+    pickNum?: number | null;
+    isTrending?: boolean | null;
+    draftYear?: number | null;
+    byeWeek?: number | null;
+    /** Parsed KTC injury blob (shape varies; renderers should treat as opaque). */
+    injury?: Record<string, unknown> | null;
+    /** True when the row reflects redraft KTC values rather than dynasty. */
+    is_redraft?: boolean;
+}
+
+export interface KTCData extends KTCFlags {
     oneQBValues?: KTCValues | null;
     superflexValues?: KTCValues | null;
 }
@@ -199,6 +217,13 @@ export interface PlayerStats {
     average_points?: number;
     total_points?: number;
     games_played?: number;
+}
+
+/** Compact ownership snapshot for the latest research week (server-attached). */
+export interface ResearchLatest {
+    week: number;
+    owned?: number | null;
+    started?: number | null;
 }
 
 export interface Player {
@@ -222,9 +247,17 @@ export interface Player {
     depth_chart_position?: number;
     status?: string;
     injury_status?: string | null;
+    /** Optional Sleeper injury detail surfaced on the dashboard expand row. */
+    injury_body_part?: string | null;
+    injury_notes?: string | null;
+    injury_start_date?: string | null;
+    practice_participation?: string | null;
+    practice_description?: string | null;
     ktc?: KTCData;
     /** Aggregated season stats from SleeperWeeklyData (avg/total/games). */
     stats?: PlayerStats;
+    /** Latest research-week ownership snapshot from `_attach_research_latest`. */
+    research_latest?: ResearchLatest | null;
     owned?: number;
     started?: number;
 }
@@ -254,6 +287,8 @@ export interface Roster {
     starters: string[];
     players: string[];
     reserve?: string[];
+    /** Sleeper taxi-squad player ids (dynasty leagues only; empty / missing otherwise). */
+    taxi?: string[];
     /** Sleeper roster.metadata (optional; may be absent on older API payloads). */
     roster_metadata?: Record<string, unknown>;
     settings: RosterSettings;
@@ -299,6 +334,8 @@ export interface DashboardLeagueBundle {
     ktcLastUpdated?: string | null;
     /** Owned draft picks per roster_id (from `compute_owned_picks`). */
     picks_by_roster?: Record<string, DashboardPickRow[]>;
+    /** Server-resolved season (query param or DB lookup) for gating season-specific UI. */
+    bundleSeason?: string | null;
 }
 
 /** IndexedDB row for `bundle_cache` (offline / stale-while-revalidate). */
@@ -392,6 +429,8 @@ export interface TeamData {
     starters: Player[];
     bench: Player[];
     reserve: Player[];
+    /** Sleeper taxi-squad players (dynasty stash; empty when league has none). */
+    taxi: Player[];
 }
 
 // ============================================================================
@@ -457,6 +496,8 @@ export interface LeagueContextType {
     tradePicksByRoster: Map<number, TradeAnalyzerPick[]>;
     league: League | null;
     researchMeta: ResearchMeta | null;
+    /** Server-resolved season for the loaded bundle; gates season-specific UI like bye week. */
+    bundleSeason: string | null;
     /** ISO string from bundle `ktcLastUpdated`; null if unknown or no KTC rows. */
     ktcLastUpdated: string | null;
     championUserId: string | null;

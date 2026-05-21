@@ -34,6 +34,14 @@ export function canonicalPickId(p: TradeAnalyzerPick): string {
   return `${yearStr}-r${roundNum}-${slot}`;
 }
 
+export function pickAssetKey(p: TradeAnalyzerPick): string {
+  const orig =
+    typeof p.original_roster_id === 'number' && Number.isFinite(p.original_roster_id)
+      ? p.original_roster_id
+      : p.owner_roster_id;
+  return `${p.owner_roster_id}:${orig}:${p.season}:r${p.round}`;
+}
+
 function buildAnalyzeTradeBody(req: TradeAnalyzerRequest): string {
   const payload: Record<string, unknown> = {
     league_id: req.league_id,
@@ -55,7 +63,165 @@ function buildAnalyzeTradeBody(req: TradeAnalyzerRequest): string {
   return JSON.stringify(payload);
 }
 
-/** Map backend `/analyze` JSON (LLM-shaped) onto UI `TradeAnalyzerResponse`. */
+function coerceStringList(value: unknown): string[] {
+  if (typeof value === 'string' && value.trim()) return [value.trim()];
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((x) => (x == null ? '' : String(x).trim()))
+    .filter((s) => s.length > 0);
+}
+
+function sideLooksLikeBareKtcDelta(side: Record<string, unknown>): boolean {
+  if (side.ktc_delta != null || side.ktcDelta != null) return false;
+  if (
+    side.trade_grade != null ||
+    side.pros != null ||
+    side.cons != null ||
+    side.sleeper_breakdown != null ||
+    side.sleeper_data != null
+  ) {
+    return false;
+  }
+  return (
+    'values_in' in side ||
+    'values_out' in side ||
+    'net' in side ||
+    'per_asset' in side
+  );
+}
+
+export function normalizeTradeAnalyzerSide(
+  block: unknown
+): TradeAnalyzerResponse['side_a'] {
+  const raw = { ...((block ?? {}) as Record<string, unknown>) };
+
+  const grades = raw.grades;
+  if (grades && typeof grades === 'object' && !Array.isArray(grades)) {
+    const g = grades as Record<string, unknown>;
+    for (const [key, val] of Object.entries(g)) {
+      if (raw[key] == null || raw[key] === '' || (Array.isArray(raw[key]) && (raw[key] as unknown[]).length === 0)) {
+        raw[key] = val;
+      }
+    }
+    delete raw.grades;
+  }
+
+  if (sideLooksLikeBareKtcDelta(raw)) {
+    const per = raw.per_asset;
+    raw.ktc_delta = {
+      values_in: raw.values_in,
+      values_out: raw.values_out,
+      net: raw.net,
+      per_asset: per,
+    };
+    delete raw.values_in;
+    delete raw.values_out;
+    delete raw.net;
+    delete raw.per_asset;
+  }
+
+  const tradeGradeRaw =
+    raw.trade_grade ?? raw.grade ?? raw.tradeGrade;
+  const trade_grade =
+    typeof tradeGradeRaw === 'string' && tradeGradeRaw.trim()
+      ? tradeGradeRaw.trim()
+      : 'C';
+
+  const kdRaw = raw.ktc_delta ?? raw.ktcDelta;
+  const kd = (
+    kdRaw && typeof kdRaw === 'object' && !Array.isArray(kdRaw)
+      ? { ...(kdRaw as Record<string, unknown>) }
+      : {}
+  ) as Record<string, unknown>;
+
+  let pros = coerceStringList(raw.pros);
+  let cons = coerceStringList(raw.cons);
+  if (pros.length === 0) pros = coerceStringList(kd.pros);
+  if (cons.length === 0) cons = coerceStringList(kd.cons);
+
+  const gradeFromDelta = kd.trade_grade ?? kd.grade;
+  const resolvedGrade =
+    typeof tradeGradeRaw === 'string' && tradeGradeRaw.trim()
+      ? trade_grade
+      : typeof gradeFromDelta === 'string' && gradeFromDelta.trim()
+        ? gradeFromDelta.trim()
+        : trade_grade;
+
+  const rawAssets = kd.per_asset;
+  const per_asset = Array.isArray(rawAssets)
+    ? (rawAssets as unknown[]).map((row, i) => {
+        const r = (row ?? {}) as Record<string, unknown>;
+        const label = String(r.label ?? r.name ?? `Asset ${i + 1}`);
+        const value =
+          typeof r.value === 'number' && Number.isFinite(r.value)
+            ? r.value
+            : Number(r.value) || 0;
+        return { label, value };
+      })
+    : [];
+
+  const sleeper = (raw.sleeper_data ?? raw.sleeper_breakdown ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const traj = sleeper.stats_trajectory;
+  let stats_trajectory: Array<{ x: string; y: number }>;
+  if (Array.isArray(traj) && traj.length > 0) {
+    const first = traj[0];
+    if (
+      first &&
+      typeof first === 'object' &&
+      'x' in (first as object) &&
+      'y' in (first as object)
+    ) {
+      stats_trajectory = (traj as Array<{ x: unknown; y: unknown }>).map(
+        (pt) => ({
+          x: String(pt.x),
+          y:
+            typeof pt.y === 'number' && Number.isFinite(pt.y)
+              ? pt.y
+              : Number(pt.y) || 0,
+        })
+      );
+    } else {
+      stats_trajectory = (traj as unknown[]).map((t, idx) => ({
+        x: typeof t === 'string' ? t.slice(0, 24) : `Note ${idx + 1}`,
+        y: idx,
+      }));
+    }
+  } else {
+    stats_trajectory = [{ x: '—', y: 0 }];
+  }
+
+  const needsRaw =
+    sleeper.needs_addressed ??
+    sleeper.team_needs_addressed ??
+    sleeper.needs ??
+    [];
+  const needs_addressed = Array.isArray(needsRaw)
+    ? needsRaw.map((x) => String(x))
+    : typeof needsRaw === 'string'
+      ? [needsRaw]
+      : [];
+
+  return {
+    trade_grade: resolvedGrade,
+    pros,
+    cons,
+    ktc_delta: {
+      values_in: Number(kd.values_in ?? kd.value_in ?? kd.in) || 0,
+      values_out: Number(kd.values_out ?? kd.value_out ?? kd.out) || 0,
+      net: Number(kd.net) || 0,
+      per_asset,
+    },
+    sleeper_data: {
+      stats_trajectory,
+      positional_impact: String(sleeper.positional_impact ?? ''),
+      needs_addressed,
+    },
+  };
+}
+
 export function normalizeTradeAnalyzerResponse(raw: unknown): TradeAnalyzerResponse {
   const parseWinner = (): TradeAnalyzerResponse['winner'] => {
     const r = raw as Record<string, unknown>;
@@ -67,101 +233,18 @@ export function normalizeTradeAnalyzerResponse(raw: unknown): TradeAnalyzerRespo
     return 'even';
   };
 
-  const normSide = (block: unknown): TradeAnalyzerResponse['side_a'] => {
-    const b = (block ?? {}) as Record<string, unknown>;
-    const kd = (b.ktc_delta ?? {}) as Record<string, unknown>;
-    const rawAssets = kd.per_asset;
-    const per_asset = Array.isArray(rawAssets)
-      ? (rawAssets as unknown[]).map((row, i) => {
-          const r = (row ?? {}) as Record<string, unknown>;
-          const label = String(r.label ?? r.name ?? `Asset ${i + 1}`);
-          const value =
-            typeof r.value === 'number' && Number.isFinite(r.value)
-              ? r.value
-              : Number(r.value) || 0;
-          return { label, value };
-        })
-      : [];
-
-    const sleeper = (b.sleeper_data ?? b.sleeper_breakdown ?? {}) as Record<
-      string,
-      unknown
-    >;
-    const traj = sleeper.stats_trajectory;
-    let stats_trajectory: Array<{ x: string; y: number }>;
-    if (Array.isArray(traj) && traj.length > 0) {
-      const first = traj[0];
-      if (
-        first &&
-        typeof first === 'object' &&
-        'x' in (first as object) &&
-        'y' in (first as object)
-      ) {
-        stats_trajectory = (traj as Array<{ x: unknown; y: unknown }>).map(
-          (pt) => ({
-            x: String(pt.x),
-            y:
-              typeof pt.y === 'number' && Number.isFinite(pt.y)
-                ? pt.y
-                : Number(pt.y) || 0,
-          })
-        );
-      } else {
-        stats_trajectory = (traj as unknown[]).map((t, idx) => ({
-          x: typeof t === 'string' ? t.slice(0, 24) : `Note ${idx + 1}`,
-          y: idx,
-        }));
-      }
-    } else {
-      stats_trajectory = [{ x: '—', y: 0 }];
-    }
-
-    const needsRaw =
-      sleeper.needs_addressed ??
-      sleeper.team_needs_addressed ??
-      sleeper.needs ??
-      [];
-    const needs_addressed = Array.isArray(needsRaw)
-      ? needsRaw.map((x) => String(x))
-      : typeof needsRaw === 'string'
-        ? [needsRaw]
-        : [];
-
-    return {
-      pros: Array.isArray(b.pros) ? (b.pros as unknown[]).map(String) : [],
-      cons: Array.isArray(b.cons) ? (b.cons as unknown[]).map(String) : [],
-      ktc_delta: {
-        values_in: Number(kd.values_in) || 0,
-        values_out: Number(kd.values_out) || 0,
-        net: Number(kd.net) || 0,
-        per_asset,
-      },
-      sleeper_data: {
-        stats_trajectory,
-        positional_impact: String(sleeper.positional_impact ?? ''),
-        needs_addressed,
-      },
-    };
-  };
-
   const r = (raw ?? {}) as Record<string, unknown>;
-  const score = Number(r.fairness_score);
-  const fairness_score = Number.isFinite(score)
-    ? Math.max(0, Math.min(100, Math.round(score)))
-    : 50;
 
   return {
-    fairness_score,
     winner: parseWinner(),
     summary_bullets: Array.isArray(r.summary_bullets)
       ? (r.summary_bullets as unknown[]).map(String)
       : [],
-    side_a: normSide(r.side_a),
-    side_b: normSide(r.side_b),
+    side_a: normalizeTradeAnalyzerSide(r.side_a),
+    side_b: normalizeTradeAnalyzerSide(r.side_b),
   };
 }
 
-/** GET /trade-analyzer/providers wire shape (`routes/trade_analyzer/providers.py`). */
 interface ProvidersRootResponse {
   default_provider?: string;
   allows_client_provider_model_choice?: boolean;
@@ -176,7 +259,6 @@ interface ProvidersRootResponse {
   enabled?: boolean;
 }
 
-/** Normalized `/trade-analyzer/providers` payload for UI. */
 export interface TradeAnalyzerProvidersBundle {
   providers: ProviderHealth[];
   defaultProvider: string;
@@ -246,7 +328,6 @@ function mapProviderRows(
   });
 }
 
-/** Full providers response including dev vs prod model-selection policy. */
 export async function fetchTradeAnalyzerProviders(): Promise<TradeAnalyzerProvidersBundle> {
   const parsed = await fetchProvidersRootThrowing();
   const loose = parsed as ProvidersRootResponse &

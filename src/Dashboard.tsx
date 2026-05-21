@@ -31,7 +31,8 @@ const Dashboard: React.FC = () => {
     playerOwnership,
     league,
     researchMeta,
-    // ktcLastUpdated,
+    bundleSeason,
+    ktcLastUpdated,
     championUserId,
     loading,
     // refreshing,
@@ -186,6 +187,10 @@ const Dashboard: React.FC = () => {
         expandedPlayer={expandedPlayer}
         onPlayerClick={handlePlayerClick}
         playerOwnership={playerOwnership}
+        bundleSeason={bundleSeason}
+        leagueSeason={league?.season ?? null}
+        researchWeek={researchMeta?.week ?? null}
+        ktcLastUpdated={ktcLastUpdated}
       />
     ));
 

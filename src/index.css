@@ -91,10 +91,11 @@ body {
 }
 
 .player-detail-row {
-  background-color: rgb(30, 136, 229);
-  border-radius: 0.25rem;
-  padding: 0.5rem 0.75rem;
   margin: 0.25rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(11, 22, 36, 0.95);
+  padding: 0.5rem 0.625rem;
 }
 
 /* Responsive grid: even rows/columns, consistent gaps at all breakpoints */
@@ -189,6 +190,64 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+/* Contending / Tanking segmented control — overrides template `button` rules above */
+.posture-toggle-group {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 1px;
+  border-radius: 0.375rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+button.posture-toggle {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-family: inherit;
+  white-space: nowrap;
+  background-color: #0b1624;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  box-shadow: none;
+  outline: none;
+}
+
+button.posture-toggle:hover:not(:disabled) {
+  color: #e5e7eb;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: transparent;
+}
+
+button.posture-toggle--active {
+  background-color: rgba(144, 202, 249, 0.15);
+  border-color: rgba(144, 202, 249, 0.4);
+  color: #fff;
+}
+
+button.posture-toggle--active:hover:not(:disabled) {
+  background-color: rgba(144, 202, 249, 0.22);
+  border-color: rgba(144, 202, 249, 0.5);
+  color: #fff;
+}
+
+button.posture-toggle:focus,
+button.posture-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(144, 202, 249, 0.35);
+}
+
+button.posture-toggle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
@@ -201,6 +260,17 @@ button:focus-visible {
 
   button {
     background-color: #f9f9f9;
+  }
+
+  button.posture-toggle {
+    background-color: #0b1624;
+    color: #6b7280;
+  }
+
+  button.posture-toggle--active {
+    background-color: rgba(100, 181, 246, 0.18);
+    border-color: rgba(100, 181, 246, 0.45);
+    color: #0f1729;
   }
 
   .league-standings-heading {
