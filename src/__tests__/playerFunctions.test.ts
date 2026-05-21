@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { openDB, IDBPDatabase, IDBPTransaction } from 'idb';
 import {
+    formatKtcInjury,
     mapBackendPlayerRow,
     playersFromDashboardBundle,
     storePlayer,
@@ -42,6 +43,37 @@ const mockBackendPlayers = [
         status: 'Active',
     },
 ];
+
+describe('formatKtcInjury', () => {
+    it('returns null for healthy-only injuryCode 1 blobs', () => {
+        expect(formatKtcInjury({ injuryCode: 1 })).toBeNull();
+        expect(formatKtcInjury({ injuryCode: '1' })).toBeNull();
+    });
+
+    it('formats KTC injury detail fields', () => {
+        expect(
+            formatKtcInjury({
+                injuryName: 'Questionable',
+                injuryCode: 2,
+                injuryArea: 'Knee - PCL',
+                injuryReturn: 'Jun 1, 2026',
+            })
+        ).toBe('Questionable · Knee - PCL · Return Jun 1, 2026');
+    });
+
+    it('formats string injury codes with summary', () => {
+        expect(formatKtcInjury({ injuryCode: 'Q', summary: 'ankle' })).toBe('Q — ankle');
+    });
+
+    it('parses JSON string injury blobs', () => {
+        expect(formatKtcInjury('{"injuryCode":1}')).toBeNull();
+        expect(
+            formatKtcInjury(
+                '{"injuryName":"Holdout","injuryCode":7,"injuryArea":"Knee - ACL + MCL"}'
+            )
+        ).toBe('Holdout · Knee - ACL + MCL');
+    });
+});
 
 describe('mapBackendPlayerRow', () => {
     it('maps backend players including stats', () => {

@@ -20,15 +20,35 @@ const TrendingChip = () => (
   </span>
 );
 
+const detailGroupShell = (compact: boolean) =>
+  compact
+    ? 'rounded border border-white/8 bg-white/2 px-1.5 py-1.5'
+    : 'rounded border border-white/8 bg-white/2 p-2 sm:p-3';
+
 const DetailGroup = ({
   title,
   children,
+  compact = false,
 }: {
   title: string;
   children: React.ReactNode;
+  compact?: boolean;
 }) => (
-  <div className='rounded border border-white/8 bg-white/2 p-2 sm:p-3'>
+  <div className={detailGroupShell(compact)}>
     <div className='mb-1.5 text-[10px] uppercase tracking-wide text-gray-400'>{title}</div>
+    <div className='flex flex-col gap-1 text-sm'>{children}</div>
+  </div>
+);
+
+/** Same card styling as DetailGroup, without a section header (compact roster meta). */
+const DetailPanel = ({
+  children,
+  compact = false,
+}: {
+  children: React.ReactNode;
+  compact?: boolean;
+}) => (
+  <div className={detailGroupShell(compact)}>
     <div className='flex flex-col gap-1 text-sm'>{children}</div>
   </div>
 );
@@ -96,6 +116,8 @@ export interface PlayerDetailContentProps {
   ownershipMap?: Record<string, { owned: number; started?: number }>;
   /** Show name + position chip (modal); roster expand row omits this. */
   showHeader?: boolean;
+  /** Denser layout for roster table expand rows. */
+  compact?: boolean;
 }
 
 export const PlayerDetailContent = memo(({
@@ -105,6 +127,7 @@ export const PlayerDetailContent = memo(({
   researchWeek,
   ownershipMap,
   showHeader = false,
+  compact = false,
 }: PlayerDetailContentProps) => {
   const ktc = player.ktc;
   const ktcValues = ktcDisplayValues(player);
@@ -126,6 +149,50 @@ export const PlayerDetailContent = memo(({
     [player.first_name, player.last_name].filter(Boolean).join(' ') ||
     'Unknown player';
 
+  const hasStatusContent =
+    (player.status && player.status !== 'Active') ||
+    !!player.injury_status ||
+    !!player.injury_notes ||
+    !!player.practice_participation ||
+    (!!ktcInjury && compact);
+
+  const compactInjured =
+    compact &&
+    ((player.status && player.status !== 'Active') ||
+      !!player.injury_status ||
+      !!player.injury_notes ||
+      !!player.practice_participation ||
+      !!ktcInjury);
+
+  const compactInjuryLine = (() => {
+    if (!compactInjured) return null;
+    const parts: string[] = [];
+    if (player.injury_status) {
+      parts.push(
+        player.injury_body_part
+          ? `${player.injury_status} — ${player.injury_body_part}`
+          : player.injury_status
+      );
+    } else if (player.status && player.status !== 'Active') {
+      parts.push(player.status);
+    }
+    if (ktcInjury) parts.push(ktcInjury);
+    if (player.practice_participation) {
+      parts.push(
+        player.practice_description
+          ? `${player.practice_participation} — ${player.practice_description}`
+          : player.practice_participation
+      );
+    }
+    if (player.injury_notes) parts.push(player.injury_notes);
+    return parts.length > 0 ? parts.join(' · ') : null;
+  })();
+
+  const compactDraftValue =
+    ktc?.draftYear != null && pickLabel
+      ? `${ktc.draftYear} · ${pickLabel}`
+      : ktc?.draftYear ?? pickLabel ?? '—';
+
   return (
     <div className={showHeader ? 'space-y-3' : undefined}>
       {showHeader ? (
@@ -137,6 +204,47 @@ export const PlayerDetailContent = memo(({
         </div>
       ) : null}
 
+      {compact ? (
+        <div className='grid grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2'>
+          <DetailPanel compact>
+            <DetailItem
+              Icon={UserIcon}
+              label='#'
+              value={`${player.number ?? 'N/A'} · ${player.team || 'Free Agent'}`}
+            />
+            <DetailItem
+              Icon={CalendarIcon}
+              label='Exp'
+              value={`${player.years_exp ?? 0} yr${(player.years_exp ?? 0) !== 1 ? 's' : ''}`}
+            />
+            <DetailItem Icon={CakeIcon} label='Age' value={player.age ?? 'N/A'} />
+            <DetailItem
+              Icon={CakeIcon}
+              label='Ht/Wt'
+              value={`${formatHeight(player)} · ${player.weight ?? 'N/A'} lbs`}
+            />
+          </DetailPanel>
+          <DetailPanel compact>
+            <DetailItem
+              Icon={AcademicCapIcon}
+              label='College'
+              value={player.college ?? 'N/A'}
+            />
+            <DetailItem label='Draft' value={compactDraftValue} />
+            <DetailItem
+              label='Bye wk'
+              value={showBye ? (ktc?.byeWeek ?? '—') : '—'}
+            />
+            {compactInjured && compactInjuryLine && (
+              <DetailItem
+                label='Injury'
+                value={compactInjuryLine}
+                tone={player.injury_status ? 'danger' : 'warn'}
+              />
+            )}
+          </DetailPanel>
+        </div>
+      ) : (
       <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3'>
         <DetailGroup title='Profile'>
           <DetailItem
@@ -177,143 +285,142 @@ export const PlayerDetailContent = memo(({
         </DetailGroup>
 
         <DetailGroup title='KTC'>
-          {ktcValues?.value != null && (
-            <DetailItem label='Value' value={ktcValues.value.toLocaleString()} />
-          )}
-          {(ktcValues?.positionalRank != null || ktcValues?.rank != null) && (
-            <DetailItem
-              label='Rank'
-              value={
-                <>
-                  {player.position} {ktcValues?.positionalRank ?? '—'}
-                  <span className='text-gray-400'>
-                    {' '}
-                    · OVR {ktcValues?.rank ?? '—'}
-                  </span>
-                </>
-              }
-            />
-          )}
-          {(ktcValues?.positionalTier != null || ktcValues?.overallTier != null) && (
-            <DetailItem
-              label='Tier'
-              value={
-                <>
-                  {player.position} T{ktcValues?.positionalTier ?? '—'}
-                  <span className='text-gray-400'>
-                    {' '}
-                    · OVR T{ktcValues?.overallTier ?? '—'}
-                  </span>
-                </>
-              }
-            />
-          )}
-          {ktc?.draftYear != null && <DetailItem label='Draft' value={ktc.draftYear} />}
-          {pickLabel && <DetailItem label='Draft slot' value={pickLabel} />}
-          {ktc?.isTrending && <DetailItem label='Status' value={<TrendingChip />} />}
-          {showBye && <DetailItem label='Bye wk' value={ktc?.byeWeek ?? '—'} />}
-          {ktcInjury && (
-            <DetailItem label='KTC injury' value={ktcInjury} tone='warn' />
-          )}
-          {ktc?.is_redraft != null && (
-            <DetailItem
-              label='KTC mode'
-              value={ktc.is_redraft ? 'Redraft' : 'Dynasty'}
-            />
-          )}
-          {!ktcValues?.value &&
-            ktcValues?.positionalRank == null &&
-            ktcValues?.rank == null && (
-              <span className='text-xs text-gray-400'>No KTC data</span>
+            {ktcValues?.value != null && (
+              <DetailItem label='Value' value={ktcValues.value.toLocaleString()} />
             )}
+            {(ktcValues?.positionalRank != null || ktcValues?.rank != null) && (
+              <DetailItem
+                label='Rank'
+                value={
+                  <>
+                    {player.position} {ktcValues?.positionalRank ?? '—'}
+                    <span className='text-gray-400'>
+                      {' '}
+                      · OVR {ktcValues?.rank ?? '—'}
+                    </span>
+                  </>
+                }
+              />
+            )}
+            {(ktcValues?.positionalTier != null || ktcValues?.overallTier != null) && (
+              <DetailItem
+                label='Tier'
+                value={
+                  <>
+                    {player.position} T{ktcValues?.positionalTier ?? '—'}
+                    <span className='text-gray-400'>
+                      {' '}
+                      · OVR T{ktcValues?.overallTier ?? '—'}
+                    </span>
+                  </>
+                }
+              />
+            )}
+            {(ktc?.draftYear != null || pickLabel) && (
+              <DetailItem
+                label='Draft'
+                value={
+                  ktc?.draftYear != null && pickLabel
+                    ? `${ktc.draftYear} · ${pickLabel}`
+                    : ktc?.draftYear ?? pickLabel
+                }
+              />
+            )}
+            {ktc?.isTrending && <DetailItem label='Status' value={<TrendingChip />} />}
+            {showBye && <DetailItem label='Bye wk' value={ktc?.byeWeek ?? '—'} />}
+            {ktcInjury && <DetailItem label='KTC injury' value={ktcInjury} tone='warn' />}
+            {!ktcValues?.value &&
+              ktcValues?.positionalRank == null &&
+              ktcValues?.rank == null && (
+                <span className='text-xs text-gray-400'>No KTC data</span>
+              )}
         </DetailGroup>
 
         {(stats?.average_points != null ||
-          stats?.total_points != null ||
-          stats?.games_played != null) && (
-          <DetailGroup title='Season stats'>
-            <DetailItem label='Avg' value={formatPoints(stats?.average_points)} />
-            <DetailItem label='Total' value={formatPoints(stats?.total_points)} />
-            <DetailItem label='GP' value={stats?.games_played ?? '—'} />
-          </DetailGroup>
-        )}
+            stats?.total_points != null ||
+            stats?.games_played != null) && (
+            <DetailGroup title='Season stats'>
+              <DetailItem label='Avg' value={formatPoints(stats?.average_points)} />
+              <DetailItem label='Total' value={formatPoints(stats?.total_points)} />
+              <DetailItem label='GP' value={stats?.games_played ?? '—'} />
+            </DetailGroup>
+          )}
 
         {(ownership?.owned != null || ownership?.started != null) && (
-          <DetailGroup title='Ownership'>
-            {researchWeek != null && (
-              <DetailItem label='Week' value={`Wk ${researchWeek}`} />
-            )}
-            {ownership?.owned != null && (
+            <DetailGroup title='Ownership'>
+              {researchWeek != null && (
+                <DetailItem label='Week' value={`Wk ${researchWeek}`} />
+              )}
+              {ownership?.owned != null && (
+                <DetailItem
+                  label='Owned'
+                  value={
+                    <span
+                      className={`font-medium tabular-nums ${getOwnershipTier(ownership.owned)}`}
+                    >
+                      {ownership.owned}%
+                    </span>
+                  }
+                />
+              )}
+              {ownership?.started != null && (
+                <DetailItem
+                  label='Started'
+                  value={
+                    <span
+                      className={`font-medium tabular-nums ${getOwnershipTier(ownership.started)}`}
+                    >
+                      {ownership.started}%
+                    </span>
+                  }
+                />
+              )}
+            </DetailGroup>
+          )}
+
+        {hasStatusContent && (
+          <DetailGroup title='Status'>
+            {player.status && player.status !== 'Active' && (
               <DetailItem
-                label='Owned'
+                label='Roster'
                 value={
-                  <span
-                    className={`font-medium tabular-nums ${getOwnershipTier(ownership.owned)}`}
-                  >
-                    {ownership.owned}%
+                  <span className='inline-block rounded border border-yellow-500/30 bg-yellow-500/20 px-1.5 py-0.5 text-xs font-medium text-yellow-400'>
+                    {player.status}
                   </span>
                 }
+                tone='warn'
               />
             )}
-            {ownership?.started != null && (
+            {player.injury_status && (
               <DetailItem
-                label='Started'
+                label='Injury'
                 value={
-                  <span
-                    className={`font-medium tabular-nums ${getOwnershipTier(ownership.started)}`}
-                  >
-                    {ownership.started}%
-                  </span>
+                  player.injury_body_part
+                    ? `${player.injury_status} — ${player.injury_body_part}`
+                    : player.injury_status
                 }
+                tone='danger'
               />
             )}
+            {player.injury_notes && (
+              <DetailItem label='Injury notes' value={player.injury_notes} tone='warn' />
+            )}
+            {player.practice_participation && (
+              <DetailItem
+                label='Practice'
+                value={
+                  player.practice_description
+                    ? `${player.practice_participation} — ${player.practice_description}`
+                    : player.practice_participation
+                }
+                tone='warn'
+              />
+            )}
+            {ktcInjury && <DetailItem label='KTC injury' value={ktcInjury} tone='warn' />}
           </DetailGroup>
         )}
-
-        <DetailGroup title='Status'>
-          {player.status && player.status !== 'Active' && (
-            <DetailItem
-              label='Roster'
-              value={
-                <span className='inline-block rounded border border-yellow-500/30 bg-yellow-500/20 px-1.5 py-0.5 text-xs font-medium text-yellow-400'>
-                  {player.status}
-                </span>
-              }
-              tone='warn'
-            />
-          )}
-          {player.injury_status && (
-            <DetailItem
-              label='Injury'
-              value={
-                player.injury_body_part
-                  ? `${player.injury_status} — ${player.injury_body_part}`
-                  : player.injury_status
-              }
-              tone='danger'
-            />
-          )}
-          {player.injury_notes && (
-            <DetailItem label='Injury notes' value={player.injury_notes} tone='warn' />
-          )}
-          {player.practice_participation && (
-            <DetailItem
-              label='Practice'
-              value={
-                player.practice_description
-                  ? `${player.practice_participation} — ${player.practice_description}`
-                  : player.practice_participation
-              }
-              tone='warn'
-            />
-          )}
-          {!player.status &&
-            !player.injury_status &&
-            !player.practice_participation && (
-              <span className='text-xs text-gray-400'>Healthy / Active</span>
-            )}
-        </DetailGroup>
       </div>
+      )}
     </div>
   );
 });

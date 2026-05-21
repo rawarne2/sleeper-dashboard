@@ -55,6 +55,7 @@ const PlayerDetailRow = memo(({
           leagueSeason={leagueSeason}
           researchWeek={researchWeek}
           ownershipMap={playerOwnership}
+          compact
         />
       </div>
     </td>

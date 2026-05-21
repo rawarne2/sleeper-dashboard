@@ -75,19 +75,100 @@ export function ktcDisplayValues(player: Player): KTCValues | null {
     return player.ktc?.superflexValues ?? player.ktc?.oneQBValues ?? null;
 }
 
-/** Stringify a KTC ``injury`` JSON blob for the expand panel. */
-export function formatKtcInjury(injury: unknown): string | null {
+const KTC_INJURY_DETAIL_KEYS = [
+    'injuryName',
+    'injuryArea',
+    'injuryReturn',
+    'injuryNotes',
+    'summary',
+] as const;
+
+const KTC_INJURY_CODE_LABELS: Record<number, string> = {
+    1: 'Healthy',
+    2: 'Questionable',
+    7: 'Holdout',
+};
+
+function parseKtcInjuryObject(injury: unknown): Record<string, unknown> | null {
     if (injury == null) return null;
-    if (typeof injury === 'string') return injury;
-    if (typeof injury !== 'object') return String(injury);
-    const obj = injury as Record<string, unknown>;
-    const code = obj.injuryCode ?? obj.code ?? obj.status ?? null;
-    if (typeof code === 'string' && code.trim().length > 0) return code;
-    try {
-        return JSON.stringify(injury);
-    } catch {
-        return null;
+    if (typeof injury === 'string') {
+        const trimmed = injury.trim();
+        if (!trimmed) return null;
+        try {
+            const parsed: unknown = JSON.parse(trimmed);
+            return typeof parsed === 'object' && parsed != null && !Array.isArray(parsed)
+                ? (parsed as Record<string, unknown>)
+                : null;
+        } catch {
+            return { injuryName: trimmed };
+        }
     }
+    if (typeof injury === 'object' && !Array.isArray(injury)) {
+        return injury as Record<string, unknown>;
+    }
+    return null;
+}
+
+function isMeaningfulKtcInjury(obj: Record<string, unknown>): boolean {
+    if (KTC_INJURY_DETAIL_KEYS.some((key) => {
+        const value = obj[key];
+        return value != null && String(value).trim() !== '';
+    })) {
+        return true;
+    }
+    const code = obj.injuryCode ?? obj.code ?? obj.status;
+    if (typeof code === 'number') return code !== 1;
+    if (typeof code === 'string') {
+        const trimmed = code.trim();
+        if (!trimmed) return false;
+        const asNum = Number(trimmed);
+        if (!Number.isNaN(asNum)) return asNum !== 1;
+        return trimmed !== '1';
+    }
+    return false;
+}
+
+function formatKtcInjuryFromObject(obj: Record<string, unknown>): string | null {
+    if (!isMeaningfulKtcInjury(obj)) return null;
+
+    const name = obj.injuryName ?? obj.injury_name;
+    if (typeof name === 'string' && name.trim()) {
+        const parts = [name.trim()];
+        const area = obj.injuryArea ?? obj.injury_area;
+        if (typeof area === 'string' && area.trim()) parts.push(area.trim());
+        const injuryReturn = obj.injuryReturn ?? obj.injury_return;
+        if (typeof injuryReturn === 'string' && injuryReturn.trim()) {
+            parts.push(`Return ${injuryReturn.trim()}`);
+        }
+        const notes = obj.injuryNotes ?? obj.injury_notes ?? obj.summary;
+        if (typeof notes === 'string' && notes.trim()) parts.push(notes.trim());
+        return parts.join(' · ');
+    }
+
+    const code = obj.injuryCode ?? obj.code ?? obj.status;
+    if (typeof code === 'string' && code.trim()) {
+        const summary = obj.summary;
+        if (typeof summary === 'string' && summary.trim()) {
+            return `${code.trim()} — ${summary.trim()}`;
+        }
+        return code.trim();
+    }
+
+    const numericCode =
+        typeof code === 'number' ? code : Number(String(code ?? '').trim());
+    if (!Number.isNaN(numericCode)) {
+        const label = KTC_INJURY_CODE_LABELS[numericCode];
+        if (label && numericCode !== 1) return label;
+    }
+
+    return null;
+}
+
+/** Human-readable KTC injury line for the expand panel (omits healthy-only blobs). */
+export function formatKtcInjury(injury: unknown): string | null {
+    const obj = parseKtcInjuryObject(injury);
+    if (!obj) return injury == null ? null : String(injury);
+    return formatKtcInjuryFromObject(obj);
 }
 
 /** Only show bye week when viewing the current bundle season. */

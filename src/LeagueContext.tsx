@@ -413,7 +413,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           roster,
           user,
           players: playersList,
-          starters: sortByKtcDesc(starters),
+          starters,
           bench: sortByKtcDesc(bench),
           reserve: sortByKtcDesc(reserve),
           taxi: sortByKtcDesc(taxi),
