@@ -186,11 +186,6 @@ export function AnalysisResultsPanel(props: {
         }
       >
         <div className='text-xs font-semibold text-gray-200 sm:text-sm'>Trade grades</div>
-        <div className='mt-2 flex flex-col gap-2 sm:flex-row sm:justify-between'>
-          <TeamGradeRow teamName={entry.side_a.team_name} grade={gradeA} />
-          <TeamGradeRow teamName={entry.side_b.team_name} grade={gradeB} />
-        </div>
-
         <div className='mt-3'>
           <KtcTradeComparison
             sideALabel={entry.side_a.team_name}
@@ -199,6 +194,8 @@ export function AnalysisResultsPanel(props: {
             sideBValue={entry.side_a.ktc_subtotal}
             sideAAssets={sideAReceives}
             sideBAssets={sideBReceives}
+            sideAGrade={gradeA}
+            sideBGrade={gradeB}
           />
         </div>
       </div>

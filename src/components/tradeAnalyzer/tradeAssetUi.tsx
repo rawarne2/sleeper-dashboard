@@ -1,3 +1,5 @@
+import { tradeGradeBorderClass, tradeGradeColorClass } from './tradeGrades';
+
 export function tradeAssetBorder(): string {
   return 'border-gray-500';
 }
@@ -109,7 +111,6 @@ export function TradeAssetTag(props: {
 }
 
 export function TradeSideTotals(props: {
-  label: string;
   value: number;
   pieceCount: number;
   tone: TradeValueTone;
@@ -120,7 +121,6 @@ export function TradeSideTotals(props: {
         <div>
           {props.pieceCount} {props.pieceCount === 1 ? 'piece' : 'pieces'}
         </div>
-        <div className='truncate font-medium text-gray-300'>{props.label}</div>
       </div>
       <div
         className={`text-lg font-bold tabular-nums leading-none sm:text-xl md:text-2xl ${tradeValueToneClass(props.tone)}`}
@@ -138,6 +138,8 @@ export function KtcTradeComparison(props: {
   sideBValue: number;
   sideAAssets: TradeAssetRow[];
   sideBAssets: TradeAssetRow[];
+  sideAGrade?: string;
+  sideBGrade?: string;
 }) {
   const a = Math.max(0, props.sideAValue);
   const b = Math.max(0, props.sideBValue);
@@ -154,8 +156,15 @@ export function KtcTradeComparison(props: {
     <div className='space-y-4'>
       <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
         <div>
-          <div className='rounded-t-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-gray-100 sm:text-sm'>
+          <div className='flex items-center gap-2 rounded-t-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-gray-100 sm:text-sm'>
             {props.sideALabel} gets…
+            {props.sideAGrade ? (
+              <span
+                className={`inline-flex min-w-[2.25rem] items-center justify-center rounded-md border px-2 py-0.5 text-xs font-bold tabular-nums ${tradeGradeBorderClass(props.sideAGrade)} ${tradeGradeColorClass(props.sideAGrade)}`}
+              >
+                {props.sideAGrade}
+              </span>
+            ) : null}
           </div>
           <div className='space-y-2 rounded-b-md border border-t-0 border-white/10 bg-black/20 p-2'>
             {props.sideAAssets.length === 0 ? (
@@ -166,7 +175,6 @@ export function KtcTradeComparison(props: {
               ))
             )}
             <TradeSideTotals
-              label={props.sideALabel}
               value={a}
               pieceCount={props.sideAAssets.length}
               tone={toneA}
@@ -174,8 +182,15 @@ export function KtcTradeComparison(props: {
           </div>
         </div>
         <div>
-          <div className='rounded-t-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-gray-100 sm:text-sm'>
+          <div className='flex items-center gap-2 rounded-t-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-gray-100 sm:text-sm'>
             {props.sideBLabel} gets…
+            {props.sideBGrade ? (
+              <span
+                className={`inline-flex min-w-[2.25rem] items-center justify-center rounded-md border px-2 py-0.5 text-xs font-bold tabular-nums ${tradeGradeBorderClass(props.sideBGrade)} ${tradeGradeColorClass(props.sideBGrade)}`}
+              >
+                {props.sideBGrade}
+              </span>
+            ) : null}
           </div>
           <div className='space-y-2 rounded-b-md border border-t-0 border-white/10 bg-black/20 p-2'>
             {props.sideBAssets.length === 0 ? (
@@ -186,7 +201,6 @@ export function KtcTradeComparison(props: {
               ))
             )}
             <TradeSideTotals
-              label={props.sideBLabel}
               value={b}
               pieceCount={props.sideBAssets.length}
               tone={toneB}
@@ -258,6 +272,10 @@ export function KtcTradeComparison(props: {
   );
 }
 
+const MODEL_FRIENDLY_HINTS: Record<string, string> = {
+  'gemini-2.0-flash': 'higher rate limits, slightly slower',
+};
+
 export function buildModelSelectOptions(
   selectableModels: string[],
   serverDefault: string
@@ -269,11 +287,12 @@ export function buildModelSelectOptions(
   const options: Array<{ value: string; label: string }> = [
     {
       value: '',
-      label: defaultNorm ? `Server default (${defaultNorm})` : 'Server default',
+      label: defaultNorm ? `${defaultNorm} (default)` : 'Server default',
     },
   ];
   for (const m of extras) {
-    options.push({ value: m, label: m });
+    const hint = MODEL_FRIENDLY_HINTS[m];
+    options.push({ value: m, label: hint ? `${m} (${hint})` : m });
   }
   return options;
 }

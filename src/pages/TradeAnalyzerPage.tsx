@@ -297,7 +297,7 @@ function inferAiRoutingFromProviders(
     primary.models?.filter((m) => typeof m === 'string' && m.trim().length > 0) ?? [];
   const modelLabel =
     models.length > 0
-      ? models.join(', ')
+      ? models[0]
       : 'Set on the server (this API did not list model names)';
   return { serviceLabel, modelLabel };
 }
@@ -404,6 +404,7 @@ export const TradeAnalyzerPage: React.FC = () => {
   const [devProvider, setDevProvider] = useState('');
   const [devModelDraft, setDevModelDraft] = useState('');
   const [taPrefsHydratedInternal, setTaPrefsHydratedInternal] = useState(false);
+  const [prodModel, setProdModel] = useState('');
   const taPrefsHydrated = taBundle?.allowsClientProviderModelChoice
     ? taPrefsHydratedInternal
     : false;
@@ -464,6 +465,19 @@ export const TradeAnalyzerPage: React.FC = () => {
   const modelSelectOptions = useMemo(
     () => buildModelSelectOptions(selectableModels, serverDefaultModelLabel),
     [selectableModels, serverDefaultModelLabel]
+  );
+
+  const prodGeminiModels = useMemo(() => {
+    if (allowsClientProviderChoice) return [];
+    const gemini = state.providers.find((p) => p.provider.toLowerCase() === 'gemini');
+    return (gemini?.models ?? []).filter((m): m is string => typeof m === 'string' && !!m.trim());
+  }, [state.providers, allowsClientProviderChoice]);
+
+  const showProdModelSelector = !allowsClientProviderChoice && prodGeminiModels.length > 1;
+
+  const prodModelSelectOptions = useMemo(
+    () => buildModelSelectOptions(prodGeminiModels, prodGeminiModels[0] ?? ''),
+    [prodGeminiModels]
   );
 
   const [rateLimitNowMs, setRateLimitNowMs] = useState<number>(() => Date.now());
@@ -558,17 +572,22 @@ export const TradeAnalyzerPage: React.FC = () => {
         allowsClientChoice: true,
       });
     }
-    return inferAiRoutingFromProviders(
+    const base = inferAiRoutingFromProviders(
       state.providers,
       taBundle?.defaultProvider,
       allowsClientProviderChoice
     );
+    if (prodModel.trim()) {
+      return { ...base, modelLabel: prodModel.trim() };
+    }
+    return base;
   }, [
     state.providers,
     taBundle,
     devProvider,
     devModelSelectValue,
     allowsClientProviderChoice,
+    prodModel,
   ]);
 
   useEffect(() => {
@@ -802,12 +821,29 @@ export const TradeAnalyzerPage: React.FC = () => {
                 </>
               ) : (
                 <>
-                  Production uses <span className='font-semibold text-gray-200'>Gemini</span> only.
-                  Anthropic, echo, and ollama stay wired up but are disabled here until
-                  configured.
+                  <span className='font-semibold text-gray-200'>Gemini</span>{' '}
+                  only. Other providers shown below but unavailable.
                 </>
               )}
             </p>
+            {showProdModelSelector ? (
+              <div className='mt-3'>
+                <label className='block text-xs sm:text-sm'>
+                  <span className='font-semibold text-gray-200'>Model</span>
+                  <select
+                    className='mt-1 w-full rounded-lg border border-white/10 bg-[#0b1624] px-2 py-2 text-sm text-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main'
+                    value={prodModel}
+                    onChange={(ev) => setProdModel(ev.target.value)}
+                  >
+                    {prodModelSelectOptions.map((opt) => (
+                      <option key={opt.value || '__default__'} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            ) : null}
             {taBundle?.allowsClientProviderModelChoice ? (
               <div className='mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2'>
                 <label className='block text-xs sm:text-sm'>
@@ -1025,6 +1061,9 @@ export const TradeAnalyzerPage: React.FC = () => {
                   devProvider.trim().toLowerCase() || taBundle.defaultProvider;
                 if (p) req.provider = p;
                 if (devModelSelectValue) req.model = devModelSelectValue;
+              }
+              if (!allowsClientProviderChoice && prodModel.trim()) {
+                req.model = prodModel.trim();
               }
 
               const analyzedAt = Date.now();
