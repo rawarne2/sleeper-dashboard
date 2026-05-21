@@ -274,8 +274,11 @@ export type TradeAnalyzerError =
 
 function extractErrorMessage(body: unknown, fallback: string): string {
   if (body && typeof body === 'object') {
-    const err = (body as { error?: unknown }).error;
-    if (typeof err === 'string' && err.trim()) return err;
+    const row = body as { error?: unknown; details?: unknown };
+    const err = typeof row.error === 'string' ? row.error.trim() : '';
+    const details = typeof row.details === 'string' ? row.details.trim() : '';
+    if (err) return err;
+    if (details) return details;
   }
   return fallback;
 }
