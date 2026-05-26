@@ -34,6 +34,38 @@ import {
 const DB_NAME = 'sleeper-players-db';
 const DB_VERSION = 4;
 
+/**
+ * Polls the KTC refresh job status endpoint until terminal state.
+ * Returns true if job succeeded, false if failed or timed out.
+ * @param delayMs   ms between polls; pass 0 in tests to skip delays
+ * @param maxAttempts max polls before giving up (default 20 ≈ 40 s at 2 s/poll)
+ * @param fetchFn   injectable fetch; defaults to global fetch
+ */
+export async function pollKtcJobStatus(
+    jobId: string,
+    delayMs = 2000,
+    maxAttempts = 20,
+    fetchFn: typeof fetch = fetch,
+): Promise<boolean> {
+    const statusUrl = buildApiUrl(API_CONFIG.ENDPOINTS.KTC_REFRESH_STATUS(jobId));
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (delayMs > 0 && attempt > 0) {
+            await new Promise((r) => setTimeout(r, delayMs));
+        }
+        try {
+            const res = await fetchFn(statusUrl);
+            if (!res.ok) return false;
+            const body = (await res.json()) as { status?: string };
+            if (body.status === 'succeeded') return true;
+            if (body.status === 'failed') return false;
+            // 'queued' or 'running' — keep polling
+        } catch {
+            return false;
+        }
+    }
+    return false; // timed out
+}
+
 interface LeagueProviderProps {
   children: ReactNode;
 }
@@ -239,6 +271,18 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
           (body as Record<string, string>).error ??
             `KTC refresh failed: ${scrapeRes.status}`
         );
+      }
+
+      // Parse async job details from 202 response; poll until terminal state
+      const scrapeBody = await scrapeRes.json().catch(() => ({})) as {
+        job_id?: string;
+        status?: string;
+      };
+      if (scrapeBody.job_id && scrapeBody.status !== 'succeeded') {
+        const succeeded = await pollKtcJobStatus(scrapeBody.job_id);
+        if (!succeeded) {
+          throw new Error('KTC refresh job did not complete successfully.');
+        }
       }
 
       const { data, playersMap } = await fetchBundle();
