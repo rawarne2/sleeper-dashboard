@@ -256,6 +256,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   );
 
   const refreshData = useCallback(async () => {
+    const forLeagueId = selectedLeagueId;
     setRefreshing(true);
     setError(null);
     try {
@@ -285,6 +286,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         }
       }
 
+      // Discard result if user switched leagues during polling
+      if (selectedLeagueIdRef.current !== forLeagueId) return;
+
       const { data, playersMap } = await fetchBundle();
 
       setRosters(data.rosters);
@@ -302,7 +306,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     } finally {
       setRefreshing(false);
     }
-  }, [fetchBundle]);
+  }, [fetchBundle, selectedLeagueId]);
 
   const loadFullData = useCallback(async () => {
     const forLeagueId = selectedLeagueId;
