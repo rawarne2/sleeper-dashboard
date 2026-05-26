@@ -462,18 +462,6 @@ export type AppPrefRow =
     | TradeAnalyzerHistoryRow;
 
 export interface PlayerDBSchema extends DBSchema {
-    players: {
-        key: string;
-        value: Player;
-    };
-    metadata: {
-        key: string;
-        value: { lastUpdated: number; key: string };
-    };
-    ownership: {
-        key: string;
-        value: PlayerOwnershipStats & { player_id: string; key: string };
-    };
     app_prefs: {
         key: string;
         value: AppPrefRow;

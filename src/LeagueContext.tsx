@@ -6,7 +6,7 @@ import React, {
   useRef,
   ReactNode,
 } from 'react';
-import { openDB, IDBPDatabase } from 'idb';
+import { openDB } from 'idb';
 import {
   Roster,
   User,
@@ -20,7 +20,7 @@ import {
   DashboardLeagueBundle,
   TradeAnalyzerPick,
 } from './types';
-import { ktcDisplayValues, storePlayers, playersFromDashboardBundle } from './playerFunctions';
+import { ktcDisplayValues, playersFromDashboardBundle } from './playerFunctions';
 import { API_CONFIG, buildApiUrl } from './apiConfig';
 import { LeagueContext } from './leagueContextValue';
 import {
@@ -32,7 +32,7 @@ import {
 } from './dashboardBundleCache';
 
 const DB_NAME = 'sleeper-players-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 interface LeagueProviderProps {
   children: ReactNode;
@@ -62,16 +62,26 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const initDB = useCallback(async () => {
     return openDB<PlayerDBSchema>(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rawDb = db as any;
         if (oldVersion < 1) {
-          db.createObjectStore('players', { keyPath: 'player_id' });
-          db.createObjectStore('metadata', { keyPath: 'key' });
-          db.createObjectStore('ownership', { keyPath: 'key' });
+          rawDb.createObjectStore('players', { keyPath: 'player_id' });
+          rawDb.createObjectStore('metadata', { keyPath: 'key' });
+          rawDb.createObjectStore('ownership', { keyPath: 'key' });
         }
         if (oldVersion < 2) {
           db.createObjectStore('app_prefs', { keyPath: 'key' });
         }
         if (oldVersion < 3) {
           db.createObjectStore('bundle_cache', { keyPath: 'key' });
+        }
+        if (oldVersion < 4) {
+          // Remove write-only stores superseded by bundle_cache
+          for (const name of ['players', 'metadata', 'ownership']) {
+            if (rawDb.objectStoreNames.contains(name)) {
+              rawDb.deleteObjectStore(name);
+            }
+          }
         }
       },
     });
@@ -138,31 +148,6 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       }
     })();
   }, [initDB]);
-
-  const persistOwnershipSeason = useCallback(
-    async (
-      db: IDBPDatabase<PlayerDBSchema>,
-      season: number,
-      ownership: PlayerOwnershipData
-    ) => {
-      const playerIds = Object.keys(ownership);
-      if (playerIds.length === 0) return;
-      const tx = db.transaction('ownership', 'readwrite');
-      await Promise.all(
-        playerIds.map((id) => {
-          const ownershipData = ownership[id];
-          return tx.store.put({
-            key: `${season}_${id}`,
-            player_id: id,
-            owned: ownershipData.owned,
-            started: ownershipData.started,
-          });
-        })
-      );
-      await tx.done;
-    },
-    []
-  );
 
   const fetchBundle = useCallback(async () => {
     const seasonParam = resolveDashboardSeasonParam(selectedLeagueId);
@@ -256,14 +241,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         );
       }
 
-      const db = await initDB();
       const { data, playersMap } = await fetchBundle();
-
-      await storePlayers(db, playersMap);
-      const seasonNum = parseInt(data.league?.season ?? '', 10);
-      if (!Number.isNaN(seasonNum)) {
-        await persistOwnershipSeason(db, seasonNum, data.ownership);
-      }
 
       setRosters(data.rosters);
       setUsers(data.users);
@@ -280,7 +258,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     } finally {
       setRefreshing(false);
     }
-  }, [initDB, fetchBundle, persistOwnershipSeason]);
+  }, [initDB, fetchBundle]);
 
   const loadFullData = useCallback(async () => {
     const forLeagueId = selectedLeagueId;
@@ -315,17 +293,9 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       setError(null);
 
       // Persist to IndexedDB after paint so UI isn't blocked
-      const seasonNum = parseInt(data.league?.season ?? '', 10);
       queueMicrotask(() => {
-        const ownershipPersist =
-          !Number.isNaN(seasonNum)
-            ? persistOwnershipSeason(db, seasonNum, data.ownership)
-            : Promise.resolve();
-        Promise.all([
-          storePlayers(db, playersMap),
-          ownershipPersist,
-          writeCachedDashboardBundle(db, cacheKey, data),
-        ]).catch((e) => console.warn('IndexedDB persist failed', e));
+        writeCachedDashboardBundle(db, cacheKey, data)
+          .catch((e) => console.warn('IndexedDB bundle cache write failed', e));
       });
     } catch (err) {
       console.error('Error loading data:', err);
@@ -346,7 +316,6 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     selectedLeagueId,
     initDB,
     fetchBundle,
-    persistOwnershipSeason,
     applyDashboardBundle,
   ]);
 

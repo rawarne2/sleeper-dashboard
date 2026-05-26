@@ -1,9 +1,7 @@
-import { IDBPDatabase, IDBPTransaction } from 'idb';
 import {
     KTCData,
     KTCValues,
     Player,
-    PlayerDBSchema,
     PlayerStats,
     ResearchLatest,
 } from './types';
@@ -32,9 +30,6 @@ interface BackendPlayer {
     stats?: PlayerStats;
     research_latest?: ResearchLatest | null;
 }
-
-const RELEVANT_POSITIONS = new Set(['QB', 'RB', 'WR', 'TE', 'K']);
-const EXCLUDED_PLAYER_STATUS = new Set(['retired']);
 
 export function mapBackendPlayerRow(player: BackendPlayer): Player | null {
     if (!player.sleeper_player_id || !player.playerName) {
@@ -216,46 +211,3 @@ export function playersFromDashboardBundle(raw: unknown): Record<string, Player>
     return {};
 }
 
-export async function storePlayer(
-    tx: IDBPTransaction<PlayerDBSchema, ['players'], 'readwrite'>,
-    player: Player
-): Promise<IDBValidKey | undefined> {
-    if (!player.player_id) {
-        return undefined;
-    }
-    const st = (player.status || '').trim().toLowerCase();
-    if (st && EXCLUDED_PLAYER_STATUS.has(st)) {
-        return undefined;
-    }
-    if (player.position && RELEVANT_POSITIONS.has(player.position)) {
-        return tx.store.put(player);
-    }
-    return undefined;
-}
-
-export const storePlayers = async (
-    db: IDBPDatabase<PlayerDBSchema>,
-    playersData: Record<string, Player>
-): Promise<void> => {
-    try {
-        const playerIds = Object.keys(playersData);
-
-        const tx = db.transaction('players', 'readwrite');
-        await Promise.all(
-            playerIds.map((id) => {
-                const player = { ...playersData[id] };
-                player.player_id = id;
-                return storePlayer(tx, player);
-            })
-        );
-        await tx.done;
-
-        await db.put('metadata', {
-            lastUpdated: Date.now(),
-            key: 'lastUpdate',
-        });
-    } catch (err) {
-        console.error('Error storing players:', err);
-        throw err;
-    }
-};
