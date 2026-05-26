@@ -258,7 +258,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     } finally {
       setRefreshing(false);
     }
-  }, [initDB, fetchBundle]);
+  }, [fetchBundle]);
 
   const loadFullData = useCallback(async () => {
     const forLeagueId = selectedLeagueId;

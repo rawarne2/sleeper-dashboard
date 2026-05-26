@@ -46,9 +46,9 @@ This is a **React + TypeScript + Vite** frontend for a Sleeper fantasy football 
 - `components/LeaguePickerCard.tsx` — First-visit modal and league switcher
 - `components/LegendModal.tsx` — Stat description overlay
 
-### IndexedDB schema (version 3)
+### IndexedDB schema (version 4)
 
-Uses the `idb` wrapper. Database name: `sleeper-players-db`. Stores: `players`, `metadata`, `ownership`, `app_prefs`, `bundle_cache`.
+Uses the `idb` wrapper. Database name: `sleeper-players-db`. Stores: `app_prefs`, `bundle_cache`.
 
 ## Styling
 

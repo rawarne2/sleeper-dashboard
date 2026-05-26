@@ -11,7 +11,7 @@ import type {
 } from '../types';
 
 const DB_NAME = 'sleeper-players-db';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 export const TRADE_ANALYZER_HISTORY_KEY = 'trade_analyzer_history';
 export const TRADE_ANALYZER_LAST_RESULT_KEY = 'trade_analyzer_last_result';
