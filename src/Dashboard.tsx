@@ -25,8 +25,8 @@ function setDashboardHash(tab: DashboardTab) {
   window.location.hash = next;
 }
 
-const headerPillBase =
-  'inline-flex max-w-full items-baseline gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-medium sm:text-xs';
+const metaPillBase =
+  'inline-flex max-w-full items-baseline gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-tight sm:px-2.5 sm:py-1 sm:text-xs';
 
 function HeaderPill({
   label,
@@ -38,7 +38,7 @@ function HeaderPill({
   className?: string;
 }) {
   return (
-    <span className={`${headerPillBase} ${className}`} title={`${label}: ${value}`}>
+    <span className={`${metaPillBase} ${className}`} title={`${label}: ${value}`}>
       <span className='shrink-0 text-gray-400'>{label}:</span>
       <span className='truncate text-gray-200'>{value}</span>
     </span>
@@ -216,11 +216,45 @@ const Dashboard: React.FC = () => {
   const researchWeek = researchMeta?.week ?? null;
   const ktcUpdatedLabel = formatKtcLastUpdatedDate(ktcLastUpdated);
 
-  const standingsHeading = (
-    <div className='league-standings-heading text-lg sm:text-2xl font-semibold text-primary-main text-center my-4 sm:my-6'>
-      League Standings
+  const showStandingsMeta =
+    leagueStatus ||
+    league?.season ||
+    researchWeek != null ||
+    league?.total_rosters != null ||
+    !loading;
+
+  const standingsMetaChips = showStandingsMeta ? (
+    <div
+      className={`${dashboardShell} mb-3 flex flex-wrap items-center justify-center gap-1 sm:gap-1.5 sm:mb-4`}
+      aria-label='League and rankings metadata'
+    >
+      {leagueStatus && (
+        <span className={`${metaPillBase} ${leagueStatus.className}`}>
+          {leagueStatus.label}
+        </span>
+      )}
+      {league?.season && <HeaderPill label='League season' value={league.season} />}
+      {!loading && researchWeek != null && (
+        <span
+          className={`${metaPillBase} bg-white/5 text-gray-200`}
+          title={`Sleeper research week ${researchWeek}`}
+        >
+          Sleeper week {researchWeek}
+        </span>
+      )}
+      {league?.total_rosters != null && (
+        <HeaderPill label='Teams' value={String(league.total_rosters)} />
+      )}
+      {!loading && (
+        <>
+          <HeaderPill label='KTC rankings' value='Superflex · Dynasty · TEP' />
+          {ktcUpdatedLabel && (
+            <HeaderPill label='KTC last updated' value={ktcUpdatedLabel} />
+          )}
+        </>
+      )}
     </div>
-  );
+  ) : null;
 
   return (
     <div className='bg-background-default text-white min-h-screen flex flex-col w-full'>
@@ -251,14 +285,14 @@ const Dashboard: React.FC = () => {
         </div>
       ) : null}
 
-      <header className='border-b border-white/10 bg-[#0d1e2e]'>
-        <div className={`${dashboardShell} flex flex-col gap-2 py-2.5 sm:py-3`}>
+      <header className='bg-[#0d1e2e]'>
+        <div className={`${dashboardShell} flex flex-col gap-1.5 py-2 sm:gap-2 sm:py-2.5`}>
           <h1 className='text-center text-xs font-semibold tracking-tight text-gray-300 sm:text-sm'>
             Sleeper Dynasty Dashboard
           </h1>
 
-          <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
-            <div className='min-w-0 text-center text-xs sm:text-left sm:text-sm'>
+          <div className='flex flex-col items-center gap-2 md:flex-row md:items-center md:justify-between md:gap-3'>
+            <div className='min-w-0 text-center text-xs md:text-left md:text-sm'>
               {league?.name ? (
                 <p className='truncate' title={league.name}>
                   <span className='text-gray-400'>League:</span>{' '}
@@ -270,70 +304,31 @@ const Dashboard: React.FC = () => {
                   <span className='text-gray-400'>—</span>
                 </p>
               )}
-              <p className='mt-0.5 font-mono text-[10px] tabular-nums sm:text-xs'>
+              <p className='mt-0.5 font-mono text-[10px] tabular-nums md:text-xs'>
                 <span className='font-sans text-gray-400'>ID:</span>{' '}
                 <span className='text-gray-400'>{selectedLeagueId}</span>
               </p>
             </div>
 
-            <div className='flex shrink-0 items-center justify-center gap-2 sm:justify-end'>
-            <button
-              type='button'
-              className='inline-flex items-center justify-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white sm:text-sm'
-              onClick={() => setLegendOpen(true)}
-              aria-label='Open legend'
-            >
-              <InformationCircleIcon className='h-4 w-4 shrink-0' />
-              Legend
-            </button>
-            <button
-              type='button'
-              className='inline-flex items-center justify-center rounded-md px-2.5 py-1.5 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white sm:text-sm'
-              onClick={() => setLeaguePickerOpen(true)}
-            >
-              Change league
-            </button>
+            <div className='flex shrink-0 items-center justify-center gap-1 md:justify-end md:gap-1.5'>
+              <button
+                type='button'
+                className='inline-flex items-center justify-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white sm:px-2.5 sm:py-1.5 sm:text-sm'
+                onClick={() => setLegendOpen(true)}
+                aria-label='Open legend'
+              >
+                <InformationCircleIcon className='h-4 w-4 shrink-0' />
+                Legend
+              </button>
+              <button
+                type='button'
+                className='inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white sm:px-2.5 sm:py-1.5 sm:text-sm'
+                onClick={() => setLeaguePickerOpen(true)}
+              >
+                Change league
+              </button>
             </div>
           </div>
-
-          {(leagueStatus ||
-            league?.season ||
-            researchWeek != null ||
-            league?.total_rosters != null ||
-            !loading) && (
-            <div className='flex flex-wrap items-center justify-center gap-1.5 border-t border-white/6 pt-2'>
-              {leagueStatus && (
-                <span className={`${headerPillBase} ${leagueStatus.className}`}>
-                  {leagueStatus.label}
-                </span>
-              )}
-              {league?.season && (
-                <HeaderPill label='League season' value={league.season} />
-              )}
-              {!loading && researchWeek != null && (
-                <span
-                  className={`${headerPillBase} bg-white/5 text-gray-200`}
-                  title={`Sleeper research week ${researchWeek}`}
-                >
-                  Sleeper week {researchWeek}
-                </span>
-              )}
-              {league?.total_rosters != null && (
-                <HeaderPill label='Teams' value={String(league.total_rosters)} />
-              )}
-              {!loading && (
-                <>
-                  <HeaderPill
-                    label='KTC rankings'
-                    value='Superflex · Dynasty · TEP'
-                  />
-                  {ktcUpdatedLabel && (
-                    <HeaderPill label='KTC last updated' value={ktcUpdatedLabel} />
-                  )}
-                </>
-              )}
-            </div>
-          )}
         </div>
       </header>
 
@@ -349,7 +344,10 @@ const Dashboard: React.FC = () => {
           <div className='grid grid-cols-1 gap-4'>
             {activeTab === 'standings' ? (
               <div className='bg-background-paper justify-center rounded-lg'>
-                {standingsHeading}
+                <div className='league-standings-heading text-lg sm:text-2xl font-semibold text-primary-main text-center mt-4 mb-2 sm:mt-6 sm:mb-2.5'>
+                  League Standings
+                </div>
+                {standingsMetaChips}
                 {renderTeamList()}
               </div>
             ) : (
