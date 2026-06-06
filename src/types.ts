@@ -32,6 +32,7 @@ export interface DashboardPickRow {
     original_roster_id: number;
     slot_bucket: string;
     ktc_value?: number | null;
+    values?: ValuesBlock | null;
 }
 
 export interface TradeAnalyzerPick {
@@ -210,6 +211,21 @@ export interface KTCData extends KTCFlags {
     superflexValues?: KTCValues | null;
 }
 
+export interface SourceValue {
+  value?: number | null;
+  rank?: number | null;
+  redraft_value?: number | null;
+  trade_frequency?: number | null;
+  volatility?: number | null;
+  trend_30day?: number | null;
+}
+
+export interface ValuesBlock {
+  blended?: number | null;
+  sources?: Partial<Record<'ktc' | 'fantasycalc', SourceValue>>;
+  projection?: { proj_ros?: number | null; proj_week?: number | null };
+}
+
 // ============================================================================
 // Player Types
 // ============================================================================
@@ -254,6 +270,7 @@ export interface Player {
     practice_participation?: string | null;
     practice_description?: string | null;
     ktc?: KTCData;
+    values?: ValuesBlock | null;
     /** Aggregated season stats from SleeperWeeklyData (avg/total/games). */
     stats?: PlayerStats;
     /** Latest research-week ownership snapshot from `_attach_research_latest`. */
