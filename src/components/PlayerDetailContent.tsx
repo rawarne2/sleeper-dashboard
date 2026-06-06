@@ -12,6 +12,8 @@ import {
   formatKtcInjury,
   ktcDisplayValues,
   showByeForSeason,
+  valueSources,
+  blendedValue,
 } from '../playerFunctions';
 
 const TrendingChip = () => (
@@ -335,6 +337,23 @@ export const PlayerDetailContent = memo(({
                 <span className='text-xs text-gray-400'>No KTC data</span>
               )}
         </DetailGroup>
+
+        {player.values && (
+          <DetailGroup title='Sources'>
+            <DetailItem label='Blended' value={blendedValue(player)?.toLocaleString() ?? '—'} />
+            {valueSources(player).map((s) => (
+              <DetailItem key={s.key} label={s.label} value={s.value?.toLocaleString() ?? '—'} />
+            ))}
+            {player.values.sources?.fantasycalc?.trade_frequency != null && (
+              <DetailItem label='FC liquidity'
+                value={`${(player.values.sources.fantasycalc.trade_frequency * 100).toFixed(2)}%`} />
+            )}
+            {player.values.projection?.proj_week != null && (
+              <DetailItem label='Sleeper proj (wk)'
+                value={player.values.projection.proj_week.toFixed(1)} />
+            )}
+          </DetailGroup>
+        )}
 
         {(stats?.average_points != null ||
             stats?.total_points != null ||
