@@ -4,6 +4,7 @@ import {
     Player,
     PlayerStats,
     ResearchLatest,
+    ValuesBlock,
 } from './types';
 
 interface BackendPlayer {
@@ -60,6 +61,7 @@ export function mapBackendPlayerRow(player: BackendPlayer): Player | null {
         number: player.number,
         depth_chart_position: player.depth_chart_position,
         ktc: player.ktc,
+        values: (player as { values?: ValuesBlock }).values ?? null,
         stats: player.stats,
         research_latest: player.research_latest ?? null,
     };
@@ -68,6 +70,26 @@ export function mapBackendPlayerRow(player: BackendPlayer): Player | null {
 /** TEP-hoisted KTC values for the dashboard row (value, rank, tiers). */
 export function ktcDisplayValues(player: Player): KTCValues | null {
     return player.ktc?.superflexValues ?? player.ktc?.oneQBValues ?? null;
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  ktc: 'KTC',
+  fantasycalc: 'FC',
+};
+
+export function blendedValue(player: Player): number | null {
+  return player.values?.blended ?? null;
+}
+
+export interface SourceChipData { key: string; label: string; value: number | null; }
+
+export function valueSources(player: Player): SourceChipData[] {
+  const sources = player.values?.sources ?? {};
+  return Object.entries(sources).map(([key, v]) => ({
+    key,
+    label: SOURCE_LABELS[key] ?? key,
+    value: v?.value ?? null,
+  }));
 }
 
 const KTC_INJURY_DETAIL_KEYS = [
