@@ -247,7 +247,7 @@ const Dashboard: React.FC = () => {
       )}
       {!loading && (
         <>
-          <HeaderPill label='KTC rankings' value='Superflex · Dynasty · TEP' />
+          <HeaderPill label='Rankings' value='Blended · KTC + FantasyCalc' />
           {ktcUpdatedLabel && (
             <HeaderPill label='KTC last updated' value={ktcUpdatedLabel} />
           )}

@@ -19,6 +19,13 @@ const OWNERSHIP_TIERS = [
   { color: 'text-gray-400', range: '< 8%', label: 'Fringe' },
 ];
 
+const VALUE_SOURCES = [
+  { label: 'Blended', text: 'Scale-normalized consensus of KTC + FantasyCalc (primary value).' },
+  { label: 'KTC', text: 'KeepTradeCut — crowd-ELO dynasty trade value. TEP adjustment is KTC-only.' },
+  { label: 'FC', text: 'FantasyCalc — value derived from real league trades; includes liquidity.' },
+  { label: 'Sleeper proj', text: 'Sleeper weekly projected fantasy points (forward-looking).' },
+];
+
 export const LegendModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
   <div
     className='fixed inset-0 z-9999 flex items-center justify-center p-4 bg-black/60'
@@ -70,7 +77,7 @@ export const LegendModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
         </div>
       </section>
 
-      <section>
+      <section className='mb-5'>
         <h3 className='text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2'>
           Ownership % Colors
         </h3>
@@ -84,6 +91,19 @@ export const LegendModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
             </div>
           ))}
         </div>
+      </section>
+
+      <section>
+        <h3 className='text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2'>
+          Value Sources
+        </h3>
+        <ul className='space-y-1'>
+          {VALUE_SOURCES.map((s) => (
+            <li key={s.label} className='text-xs text-gray-400'>
+              <span className='font-medium text-gray-200'>{s.label}</span> · {s.text}
+            </li>
+          ))}
+        </ul>
       </section>
     </div>
   </div>
