@@ -3,8 +3,9 @@ import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { Player } from '../types';
 import { getOwnershipTier } from '../utils/teamStats';
 import { formatPoints } from '../utils/formatting';
-import { ktcDisplayValues } from '../playerFunctions';
+import { ktcDisplayValues, blendedValue, valueSources } from '../playerFunctions';
 import { PlayerDetailContent } from './PlayerDetailContent';
+import { SourceChip } from './SourceChip';
 
 export type OwnershipMap = Record<string, { owned: number; started?: number }>;
 
@@ -178,10 +179,15 @@ const PlayerRow = memo(
             <span className='text-sm text-gray-100'>{stats?.games_played ?? '—'}</span>
           </td>
 
-          <td className={`p-1.5 w-[50px] text-center align-middle border-l border-white/10 ${COL_A}`}>
+          <td className={`p-1.5 w-[70px] text-center align-middle border-l border-white/10 ${COL_A}`}>
             <span className='text-sm font-medium tabular-nums text-gray-100'>
-              {ktcValues?.value ?? '—'}
+              {blendedValue(player) ?? ktcValues?.value ?? '—'}
             </span>
+            <div className='mt-0.5 flex flex-wrap justify-center gap-0.5'>
+              {valueSources(player).map((s) => (
+                <SourceChip key={s.key} label={s.label} value={s.value} />
+              ))}
+            </div>
           </td>
 
           <td className='p-1.5 text-center align-middle whitespace-nowrap'>
