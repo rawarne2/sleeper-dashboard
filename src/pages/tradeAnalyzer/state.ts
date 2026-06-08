@@ -35,6 +35,7 @@ export type State = {
   rateLimitUntilMs: number | null;
   rateLimitMessage: string | null;
   analysisError: string | null;
+  pendingFeedbackAnalysisId: string | null;
 };
 
 export type Action =
@@ -46,8 +47,9 @@ export type Action =
   | { type: 'setContext'; value: string }
   | { type: 'setActiveSide'; side: SideKey }
   | { type: 'analyzeStart' }
-  | { type: 'analyzeReady' }
+  | { type: 'analyzeReady'; analysisId?: string }
   | { type: 'analyzeFailed' }
+  | { type: 'feedbackResolved' }
   | { type: 'setProviders'; providers: ProviderHealth[] }
   | { type: 'setRateLimitUntil'; untilMs: number | null; message: string | null }
   | { type: 'setAnalysisError'; message: string | null }
@@ -66,6 +68,7 @@ export function createInitialState(): State {
     rateLimitUntilMs: null,
     rateLimitMessage: null,
     analysisError: null,
+    pendingFeedbackAnalysisId: null,
   };
 }
 
@@ -166,7 +169,10 @@ export function reducer(state: State, action: Action): State {
       return { ...state, results: { status: 'loading' } };
     }
     case 'analyzeReady': {
-      return { ...state, results: { status: 'ready' } };
+      return { ...state, results: { status: 'ready' }, pendingFeedbackAnalysisId: action.analysisId ?? null };
+    }
+    case 'feedbackResolved': {
+      return { ...state, pendingFeedbackAnalysisId: null };
     }
     case 'analyzeFailed': {
       return { ...state, results: { status: 'idle' } };

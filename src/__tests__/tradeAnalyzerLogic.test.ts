@@ -160,6 +160,17 @@ describe('reducer', () => {
     expect(s1.context).toBe('');
     expect(s1.results.status).toBe('idle');
   });
+
+  it('gate blocks until feedback resolved', () => {
+    const ready = reducer(createInitialState(), { type: 'analyzeReady', analysisId: 'x1' });
+    expect(ready.pendingFeedbackAnalysisId).toBe('x1');
+    const resolved = reducer(ready, { type: 'feedbackResolved' });
+    expect(resolved.pendingFeedbackAnalysisId).toBeNull();
+  });
+  it('analyzeReady with no id does not gate', () => {
+    const ready = reducer(createInitialState(), { type: 'analyzeReady' });
+    expect(ready.pendingFeedbackAnalysisId).toBeNull();
+  });
 });
 
 // --- helpers: team labels -------------------------------------------------
