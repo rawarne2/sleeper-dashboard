@@ -2,6 +2,7 @@ import { API_CONFIG, buildApiUrl } from '../apiConfig';
 import type {
   ApiResponse,
   ProviderHealth,
+  TradeFeedbackRequest,
   TradeAnalyzerPick,
   TradeAnalyzerRateLimitError,
   TradeAnalyzerRequest,
@@ -242,6 +243,7 @@ export function normalizeTradeAnalyzerResponse(raw: unknown): TradeAnalyzerRespo
       : [],
     side_a: normalizeTradeAnalyzerSide(r.side_a),
     side_b: normalizeTradeAnalyzerSide(r.side_b),
+    analysis_id: typeof r.analysis_id === 'string' ? r.analysis_id : undefined,
   };
 }
 
@@ -434,4 +436,13 @@ export async function analyzeTrade(
   }
 
   return normalizeTradeAnalyzerResponse(body);
+}
+
+export async function submitTradeFeedback(body: TradeFeedbackRequest): Promise<void> {
+  const res = await fetch(buildApiUrl(API_CONFIG.ENDPOINTS.TRADE_ANALYZER_FEEDBACK), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`feedback failed: ${res.status}`);
 }

@@ -20,6 +20,7 @@ export const API_CONFIG = {
     KTC_REFRESH_STATUS: (jobId: string) => `/ktc/refresh/status/${jobId}`,
     TRADE_ANALYZER_PROVIDERS: '/trade-analyzer/providers',
     TRADE_ANALYZER_ANALYZE: '/trade-analyzer/analyze',
+    TRADE_ANALYZER_FEEDBACK: '/trade-analyzer/feedback',
   },
 };
 
