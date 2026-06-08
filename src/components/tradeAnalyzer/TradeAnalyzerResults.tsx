@@ -75,9 +75,6 @@ function ResultsColumn(props: {
   grade: string;
   data: TradeAnalyzerResponse['side_a'];
 }) {
-  const hasSleeper =
-    Boolean(props.data.sleeper_data.positional_impact?.trim()) ||
-    props.data.sleeper_data.needs_addressed.length > 0;
   const hasPros = props.data.pros.length > 0;
   const hasCons = props.data.cons.length > 0;
 
@@ -94,24 +91,6 @@ function ResultsColumn(props: {
       </div>
 
       <div className='mt-2 grid grid-cols-1 gap-2'>
-        {hasSleeper ? (
-          <div className='rounded-lg border border-white/10 bg-white/5 p-2 sm:p-3'>
-            <div className='text-xs font-semibold text-gray-200 sm:text-sm'>Sleeper Data</div>
-            {props.data.sleeper_data.positional_impact?.trim() ? (
-              <div className='mt-2 text-xs text-gray-300 sm:text-sm'>
-                {props.data.sleeper_data.positional_impact}
-              </div>
-            ) : null}
-            {props.data.sleeper_data.needs_addressed.length > 0 ? (
-              <ul className='mt-2 list-disc space-y-1 pl-5 text-xs text-gray-300 sm:text-sm'>
-                {props.data.sleeper_data.needs_addressed.map((s) => (
-                  <li key={s}>{s}</li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
-
         {hasPros ? (
           <div className='rounded-lg border border-white/10 bg-white/5 p-2 sm:p-3'>
             <div className='text-xs font-semibold text-gray-200 sm:text-sm'>Pros</div>
@@ -198,21 +177,6 @@ export function AnalysisResultsPanel(props: {
         </div>
       </div>
 
-      <div className='mt-2 grid grid-cols-1 gap-3 md:grid-cols-2'>
-        <ResultsColumn
-          teamName={entry.side_a.team_name}
-          teamSubtitle={entry.side_a.team_subtitle}
-          grade={gradeA}
-          data={res.side_a}
-        />
-        <ResultsColumn
-          teamName={entry.side_b.team_name}
-          teamSubtitle={entry.side_b.team_subtitle}
-          grade={gradeB}
-          data={res.side_b}
-        />
-      </div>
-
       <div
         className={
           props.compact
@@ -226,6 +190,21 @@ export function AnalysisResultsPanel(props: {
             <li key={s}>{s}</li>
           ))}
         </ul>
+      </div>
+
+      <div className='mt-2 grid grid-cols-1 gap-3 md:grid-cols-2'>
+        <ResultsColumn
+          teamName={entry.side_a.team_name}
+          teamSubtitle={entry.side_a.team_subtitle}
+          grade={gradeA}
+          data={res.side_a}
+        />
+        <ResultsColumn
+          teamName={entry.side_b.team_name}
+          teamSubtitle={entry.side_b.team_subtitle}
+          grade={gradeB}
+          data={res.side_b}
+        />
       </div>
     </div>
   );

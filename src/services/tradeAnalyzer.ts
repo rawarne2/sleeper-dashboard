@@ -78,8 +78,7 @@ function sideLooksLikeBareKtcDelta(side: Record<string, unknown>): boolean {
     side.trade_grade != null ||
     side.pros != null ||
     side.cons != null ||
-    side.sleeper_breakdown != null ||
-    side.sleeper_data != null
+    side.sleeper_breakdown != null
   ) {
     return false;
   }
@@ -161,50 +160,6 @@ export function normalizeTradeAnalyzerSide(
       })
     : [];
 
-  const sleeper = (raw.sleeper_data ?? raw.sleeper_breakdown ?? {}) as Record<
-    string,
-    unknown
-  >;
-  const traj = sleeper.stats_trajectory;
-  let stats_trajectory: Array<{ x: string; y: number }>;
-  if (Array.isArray(traj) && traj.length > 0) {
-    const first = traj[0];
-    if (
-      first &&
-      typeof first === 'object' &&
-      'x' in (first as object) &&
-      'y' in (first as object)
-    ) {
-      stats_trajectory = (traj as Array<{ x: unknown; y: unknown }>).map(
-        (pt) => ({
-          x: String(pt.x),
-          y:
-            typeof pt.y === 'number' && Number.isFinite(pt.y)
-              ? pt.y
-              : Number(pt.y) || 0,
-        })
-      );
-    } else {
-      stats_trajectory = (traj as unknown[]).map((t, idx) => ({
-        x: typeof t === 'string' ? t.slice(0, 24) : `Note ${idx + 1}`,
-        y: idx,
-      }));
-    }
-  } else {
-    stats_trajectory = [{ x: '—', y: 0 }];
-  }
-
-  const needsRaw =
-    sleeper.needs_addressed ??
-    sleeper.team_needs_addressed ??
-    sleeper.needs ??
-    [];
-  const needs_addressed = Array.isArray(needsRaw)
-    ? needsRaw.map((x) => String(x))
-    : typeof needsRaw === 'string'
-      ? [needsRaw]
-      : [];
-
   return {
     trade_grade: resolvedGrade,
     pros,
@@ -214,11 +169,6 @@ export function normalizeTradeAnalyzerSide(
       values_out: Number(kd.values_out ?? kd.value_out ?? kd.out) || 0,
       net: Number(kd.net) || 0,
       per_asset,
-    },
-    sleeper_data: {
-      stats_trajectory,
-      positional_impact: String(sleeper.positional_impact ?? ''),
-      needs_addressed,
     },
   };
 }

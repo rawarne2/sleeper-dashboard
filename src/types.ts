@@ -94,11 +94,6 @@ export interface TradeAnalyzerResponse {
                 value: number;
             }>;
         };
-        sleeper_data?: {
-            stats_trajectory: Array<{ x: string; y: number }>;
-            positional_impact: string;
-            needs_addressed: string[];
-        };
     };
     side_b: TradeAnalyzerResponse['side_a'];
 }
