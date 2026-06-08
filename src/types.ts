@@ -78,6 +78,7 @@ export interface TradeAnalyzerRequest {
 }
 
 export interface TradeAnalyzerResponse {
+    analysis_id?: string;
     winner: TradeSide | 'even';
     summary_bullets: string[];
     side_a: {
@@ -93,7 +94,7 @@ export interface TradeAnalyzerResponse {
                 value: number;
             }>;
         };
-        sleeper_data: {
+        sleeper_data?: {
             stats_trajectory: Array<{ x: string; y: number }>;
             positional_impact: string;
             needs_addressed: string[];
@@ -149,10 +150,22 @@ export interface TradeAnalyzerHistoryEntry {
     createdAt: number;
     league_id: string;
     additional_context?: string;
+    analysis_id?: string;
+    feedbackStatus?: 'unrated' | 'done' | 'skipped';
     request: TradeAnalyzerRequest;
     response: TradeAnalyzerResponse;
     side_a: TradeAnalyzerSideSnapshot;
     side_b: TradeAnalyzerSideSnapshot;
+}
+
+export interface TradeFeedbackRequest {
+    analysis_id: string;
+    client_id: string;
+    league_id: string;
+    agree_winner?: 'agree' | 'disagree' | 'unsure';
+    grade?: string;
+    note?: string;
+    skipped?: boolean;
 }
 
 export interface TradeAnalyzerHistoryRow {
