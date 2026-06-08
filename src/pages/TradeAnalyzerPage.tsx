@@ -15,13 +15,16 @@ import type {
   TradeAnalyzerPick,
   TradeAnalyzerRequest,
 } from '../types';
+import { getClientId } from '../services/clientId';
 import {
   analyzeTrade,
   canonicalPickId,
   fetchTradeAnalyzerProviders,
   pickAssetKey,
+  submitTradeFeedback,
   type TradeAnalyzerError,
 } from '../services/tradeAnalyzer';
+import { FeedbackGate, type GateValues } from './tradeAnalyzer/FeedbackGate';
 import {
   buildTradeAnalyzerHistoryEntry,
   ktcValueForPlayer,
@@ -106,6 +109,8 @@ export const TradeAnalyzerPage: React.FC = () => {
   const [history, setHistory] = useState<TradeAnalyzerHistoryEntry[]>([]);
   const [pinnedAnalysisId, setPinnedAnalysisId] = useState<string | null>(null);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
   const allowsClientProviderChoice = Boolean(
     taBundle?.allowsClientProviderModelChoice
@@ -422,7 +427,8 @@ export const TradeAnalyzerPage: React.FC = () => {
     state.sideA.assets.length > 0 &&
     state.sideB.assets.length > 0 &&
     state.results.status !== 'loading' &&
-    !isRateLimited;
+    !isRateLimited &&
+    state.pendingFeedbackAnalysisId == null;
 
   const displayPinnedId = hasTradeBuilderAssets ? pinnedAnalysisId : null;
 
@@ -435,6 +441,29 @@ export const TradeAnalyzerPage: React.FC = () => {
     pinnedEntry != null && state.results.status !== 'loading';
 
   const showRecentSection = history.length > 0 && (!showPinnedResults || !hasTradeBuilderAssets);
+
+  const handleFeedbackSubmit = async (v: GateValues) => {
+    const id = state.pendingFeedbackAnalysisId;
+    if (!id) return;
+    setFeedbackSubmitting(true); setFeedbackError(null);
+    try {
+      await submitTradeFeedback({ analysis_id: id, client_id: getClientId(),
+        league_id: selectedLeagueId ?? '', agree_winner: v.agree_winner, grade: v.grade, note: v.note });
+      dispatch({ type: 'feedbackResolved' });
+    } catch {
+      setFeedbackError('Could not save feedback. Try again or Skip.');
+    } finally { setFeedbackSubmitting(false); }
+  };
+  const handleFeedbackSkip = async () => {
+    const id = state.pendingFeedbackAnalysisId;
+    if (!id) { dispatch({ type: 'feedbackResolved' }); return; }
+    setFeedbackSubmitting(true); setFeedbackError(null);
+    try {
+      await submitTradeFeedback({ analysis_id: id, client_id: getClientId(),
+        league_id: selectedLeagueId ?? '', skipped: true });
+    } catch { /* skip is best-effort */ }
+    finally { setFeedbackSubmitting(false); dispatch({ type: 'feedbackResolved' }); }
+  };
 
   return (
     <div className='w-full'>
@@ -770,7 +799,7 @@ export const TradeAnalyzerPage: React.FC = () => {
                   setHistory(nextHistory);
                   setPinnedAnalysisId(entry.id);
                   setExpandedHistoryId(null);
-                  dispatch({ type: 'analyzeReady' });
+                  dispatch({ type: 'analyzeReady', analysisId: res.analysis_id });
                   const el = document.getElementById('trade-analyzer-results');
                   el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 } catch (e) {
@@ -813,7 +842,15 @@ export const TradeAnalyzerPage: React.FC = () => {
             <div className='text-xs sm:text-sm text-red-300'>{state.rateLimitMessage}</div>
           ) : state.analysisError ? (
             <div className='text-xs sm:text-sm text-red-300'>{state.analysisError}</div>
+          ) : state.pendingFeedbackAnalysisId != null ? (
+            <div className='text-xs text-amber-300/70'>Rate or skip the last result to run another</div>
           ) : null}
+          {state.pendingFeedbackAnalysisId && (
+            <>
+              <FeedbackGate onSubmit={handleFeedbackSubmit} onSkip={handleFeedbackSkip} submitting={feedbackSubmitting} />
+              {feedbackError && <div className='mt-1 text-xs text-red-300'>{feedbackError}</div>}
+            </>
+          )}
         </div>
       </div>
 
