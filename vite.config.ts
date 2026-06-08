@@ -8,5 +8,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     host: true
-  }
+  },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/__tests__/setup.ts'],
+  },
 })
