@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { normalizeTradeAnalyzerResponse } from '../../services/tradeAnalyzer';
 import type {
@@ -119,7 +120,7 @@ function ResultsColumn(props: {
 export function AnalysisResultsPanel(props: {
   entry: TradeAnalyzerHistoryEntry;
   compact?: boolean;
-  onRunAnother?: () => void;
+  footer?: ReactNode;
 }) {
   const { entry } = props;
   const res = normalizeTradeAnalyzerResponse(entry.response);
@@ -134,22 +135,11 @@ export function AnalysisResultsPanel(props: {
       className={props.compact ? 'pt-2' : 'mt-3 rounded-xl border border-white/10 bg-[#0d1e2e] p-3 sm:p-4'}
     >
       {!props.compact ? (
-        <div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between'>
-          <div>
-            <div className='text-base font-semibold text-gray-100 sm:text-lg'>Analysis Results</div>
-            <div className='mt-1 text-xs text-gray-400 sm:text-sm'>
-              Analyzed at {new Date(entry.createdAt).toLocaleString()}
-            </div>
+        <div>
+          <div className='text-base font-semibold text-gray-100 sm:text-lg'>Analysis Results</div>
+          <div className='mt-1 text-xs text-gray-400 sm:text-sm'>
+            Analyzed at {new Date(entry.createdAt).toLocaleString()}
           </div>
-          {props.onRunAnother ? (
-            <button
-              type='button'
-              className='inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-gray-200 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-main sm:text-sm'
-              onClick={props.onRunAnother}
-            >
-              Run another
-            </button>
-          ) : null}
         </div>
       ) : (
         <div className='mb-2 text-xs text-gray-400 sm:text-sm'>
@@ -206,6 +196,8 @@ export function AnalysisResultsPanel(props: {
           data={res.side_b}
         />
       </div>
+
+      {!props.compact && props.footer ? <div className='mt-3'>{props.footer}</div> : null}
     </div>
   );
 }

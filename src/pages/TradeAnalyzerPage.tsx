@@ -110,6 +110,7 @@ export const TradeAnalyzerPage: React.FC = () => {
   const [pinnedAnalysisId, setPinnedAnalysisId] = useState<string | null>(null);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackDone, setFeedbackDone] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
   const allowsClientProviderChoice = Boolean(
@@ -440,6 +441,10 @@ export const TradeAnalyzerPage: React.FC = () => {
   const showPinnedResults =
     pinnedEntry != null && state.results.status !== 'loading';
 
+  const pinnedNeedsFeedback =
+    state.pendingFeedbackAnalysisId != null &&
+    pinnedEntry?.response?.analysis_id === state.pendingFeedbackAnalysisId;
+
   const showRecentSection = history.length > 0 && (!showPinnedResults || !hasTradeBuilderAssets);
 
   const handleFeedbackSubmit = async (v: GateValues) => {
@@ -449,20 +454,26 @@ export const TradeAnalyzerPage: React.FC = () => {
     try {
       await submitTradeFeedback({ analysis_id: id, client_id: getClientId(),
         league_id: selectedLeagueId ?? '', agree_winner: v.agree_winner, grade: v.grade, note: v.note });
-      dispatch({ type: 'feedbackResolved' });
+      setFeedbackDone(true);
     } catch {
-      setFeedbackError('Could not save feedback. Try again or Skip.');
+      setFeedbackError('Could not save feedback. Try again, or Run another to skip.');
     } finally { setFeedbackSubmitting(false); }
   };
-  const handleFeedbackSkip = async () => {
+  const handleRunAnother = async () => {
     const id = state.pendingFeedbackAnalysisId;
-    if (!id) { dispatch({ type: 'feedbackResolved' }); return; }
-    setFeedbackSubmitting(true); setFeedbackError(null);
-    try {
-      await submitTradeFeedback({ analysis_id: id, client_id: getClientId(),
-        league_id: selectedLeagueId ?? '', skipped: true });
-    } catch { /* skip is best-effort */ }
-    finally { setFeedbackSubmitting(false); dispatch({ type: 'feedbackResolved' }); }
+    if (id && !feedbackDone) {
+      try {
+        await submitTradeFeedback({ analysis_id: id, client_id: getClientId(),
+          league_id: selectedLeagueId ?? '', skipped: true });
+      } catch { /* skip is best-effort */ }
+    }
+    setFeedbackError(null);
+    setFeedbackDone(false);
+    dispatch({ type: 'feedbackResolved' });
+    setPinnedAnalysisId(null);
+    setExpandedHistoryId(null);
+    dispatch({ type: 'resetAll' });
+    builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -799,6 +810,7 @@ export const TradeAnalyzerPage: React.FC = () => {
                   setHistory(nextHistory);
                   setPinnedAnalysisId(entry.id);
                   setExpandedHistoryId(null);
+                  setFeedbackDone(false);
                   dispatch({ type: 'analyzeReady', analysisId: res.analysis_id });
                   const el = document.getElementById('trade-analyzer-results');
                   el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -843,14 +855,8 @@ export const TradeAnalyzerPage: React.FC = () => {
           ) : state.analysisError ? (
             <div className='text-xs sm:text-sm text-red-300'>{state.analysisError}</div>
           ) : state.pendingFeedbackAnalysisId != null ? (
-            <div className='text-xs text-amber-300/70'>Rate or skip the last result to run another</div>
+            <div className='text-xs text-amber-300/70'>Rate the result below, then Run another</div>
           ) : null}
-          {state.pendingFeedbackAnalysisId && (
-            <>
-              <FeedbackGate onSubmit={handleFeedbackSubmit} onSkip={handleFeedbackSkip} submitting={feedbackSubmitting} />
-              {feedbackError && <div className='mt-1 text-xs text-red-300'>{feedbackError}</div>}
-            </>
-          )}
         </div>
       </div>
 
@@ -868,12 +874,29 @@ export const TradeAnalyzerPage: React.FC = () => {
       {showPinnedResults && pinnedEntry ? (
         <AnalysisResultsPanel
           entry={pinnedEntry}
-          onRunAnother={() => {
-            setPinnedAnalysisId(null);
-            setExpandedHistoryId(null);
-            dispatch({ type: 'resetAll' });
-            builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }}
+          footer={
+            pinnedNeedsFeedback ? (
+              <>
+                <FeedbackGate
+                  onSubmit={handleFeedbackSubmit}
+                  onRunAnother={handleRunAnother}
+                  submitting={feedbackSubmitting}
+                  done={feedbackDone}
+                />
+                {feedbackError && (
+                  <div className='mt-1 text-xs text-red-300'>{feedbackError}</div>
+                )}
+              </>
+            ) : (
+              <button
+                type='button'
+                onClick={handleRunAnother}
+                className='inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-gray-200 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white sm:text-sm'
+              >
+                Run another
+              </button>
+            )
+          }
         />
       ) : null}
 
