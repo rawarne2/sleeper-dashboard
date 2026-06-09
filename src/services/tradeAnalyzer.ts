@@ -72,8 +72,15 @@ function coerceStringList(value: unknown): string[] {
     .filter((s) => s.length > 0);
 }
 
-function sideLooksLikeBareKtcDelta(side: Record<string, unknown>): boolean {
-  if (side.ktc_delta != null || side.ktcDelta != null) return false;
+function sideLooksLikeBareValueDelta(side: Record<string, unknown>): boolean {
+  if (
+    side.value_delta != null ||
+    side.valueDelta != null ||
+    side.ktc_delta != null ||
+    side.ktcDelta != null
+  ) {
+    return false;
+  }
   if (
     side.trade_grade != null ||
     side.pros != null ||
@@ -106,9 +113,9 @@ export function normalizeTradeAnalyzerSide(
     delete raw.grades;
   }
 
-  if (sideLooksLikeBareKtcDelta(raw)) {
+  if (sideLooksLikeBareValueDelta(raw)) {
     const per = raw.per_asset;
-    raw.ktc_delta = {
+    raw.value_delta = {
       values_in: raw.values_in,
       values_out: raw.values_out,
       net: raw.net,
@@ -127,7 +134,8 @@ export function normalizeTradeAnalyzerSide(
       ? tradeGradeRaw.trim()
       : 'C';
 
-  const kdRaw = raw.ktc_delta ?? raw.ktcDelta;
+  const kdRaw =
+    raw.value_delta ?? raw.valueDelta ?? raw.ktc_delta ?? raw.ktcDelta;
   const kd = (
     kdRaw && typeof kdRaw === 'object' && !Array.isArray(kdRaw)
       ? { ...(kdRaw as Record<string, unknown>) }
@@ -164,7 +172,7 @@ export function normalizeTradeAnalyzerSide(
     trade_grade: resolvedGrade,
     pros,
     cons,
-    ktc_delta: {
+    value_delta: {
       values_in: Number(kd.values_in ?? kd.value_in ?? kd.in) || 0,
       values_out: Number(kd.values_out ?? kd.value_out ?? kd.out) || 0,
       net: Number(kd.net) || 0,

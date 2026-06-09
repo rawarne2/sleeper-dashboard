@@ -85,7 +85,7 @@ export interface TradeAnalyzerResponse {
         trade_grade: string;
         pros: string[];
         cons: string[];
-        ktc_delta: {
+        value_delta: {
             values_in: number;
             values_out: number;
             net: number;
