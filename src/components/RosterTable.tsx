@@ -1,13 +1,24 @@
-import React, { memo } from 'react';
+import React, { memo, type ReactNode } from 'react';
 import { ChevronUpIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { Player } from '../types';
 import { getOwnershipTier } from '../utils/teamStats';
 import { formatPoints } from '../utils/formatting';
-import { ktcDisplayValues, blendedValue, valueSources } from '../playerFunctions';
+import {
+  formatValue,
+  formatCount,
+  formatDecimal,
+  formatLiquidity,
+} from '../utils/valueDisplay';
+import { ktcDisplayValues } from '../playerFunctions';
 import { PlayerDetailContent } from './PlayerDetailContent';
-import { SourceChip } from './SourceChip';
+import { ColumnHeader } from './playerTable/ColumnHeader';
+import { PositionBadge } from './playerTable/PositionBadge';
+import { ValueCell, NumCell } from './playerTable/cells';
 
 export type OwnershipMap = Record<string, { owned: number; started?: number }>;
+
+/** Total leaf-column count, used for full-width rows (dividers, expand). */
+const TOTAL_COLS = 17;
 
 function resolveOwnership(player: Player, ownershipMap: OwnershipMap) {
   if (player.owned != null) return { owned: player.owned, started: player.started ?? null };
@@ -18,21 +29,16 @@ function resolveOwnership(player: Player, ownershipMap: OwnershipMap) {
   return null;
 }
 
-const PositionChip = ({ player }: { player: Player }) => (
-  <span className={`player-chip player-chip-${player.position || 'DEF'}`}>
-    {player.position || 'N/A'}
-  </span>
-);
-
 const TrendingChip = () => (
   <span className='ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-amber-500/15 text-amber-300 border border-amber-500/30'>
     Trending
   </span>
 );
 
-const COL_A = 'bg-white/[0.04]';
-const theadSticky = 'sticky top-0 z-10 bg-[#0d1e2e]';
-const thBase = 'text-xs sm:text-sm font-medium text-gray-400';
+// Subtle zebra tint to keep paired columns scannable across the wide table.
+const COL_A = 'bg-white/[0.025]';
+const GROUP_EDGE = 'border-l border-line';
+const cellPad = 'px-1.5 py-1.5';
 
 const PlayerDetailRow = memo(({
   player,
@@ -48,7 +54,7 @@ const PlayerDetailRow = memo(({
   playerOwnership: OwnershipMap;
 }) => (
   <tr>
-    <td colSpan={10} className='p-0 align-top'>
+    <td colSpan={TOTAL_COLS} className='p-0 align-top'>
       <div className='player-detail-row'>
         <PlayerDetailContent
           player={player}
@@ -77,21 +83,40 @@ const SectionDivider = ({
       ? 'text-red-400/70'
       : variant === 'taxi'
         ? 'text-amber-300/80'
-        : 'text-gray-500';
+        : 'text-ink-mid';
   return (
     <tr className='bg-[#0d1a27]'>
       <td
-        colSpan={10}
-        className={`px-3 py-1.5 text-sm font-semibold uppercase tracking-wider ${tone}`}
+        colSpan={TOTAL_COLS}
+        className={`hd px-3 py-1.5 text-sm font-semibold uppercase tracking-wider ${tone}`}
       >
         {label}{' '}
-        <span className='font-normal normal-case tracking-normal text-gray-400'>
-          ({count})
-        </span>
+        <span className='font-normal normal-case tracking-normal text-ink-mid'>({count})</span>
       </td>
     </tr>
   );
 };
+
+/** Centered numeric leaf cell with optional zebra tint and group edge. */
+const Cell = ({
+  children,
+  tint = false,
+  edge = false,
+  width = '',
+}: {
+  children: ReactNode;
+  tint?: boolean;
+  edge?: boolean;
+  width?: string;
+}) => (
+  <td
+    className={`${cellPad} text-center align-middle ${tint ? COL_A : ''} ${
+      edge ? GROUP_EDGE : ''
+    } ${width}`}
+  >
+    {children}
+  </td>
+);
 
 interface PlayerRowProps {
   player: Player;
@@ -120,6 +145,8 @@ const PlayerRow = memo(
     const started = ownership?.started;
     const stats = player.stats;
     const ktcValues = ktcDisplayValues(player);
+    const fc = player.values?.sources?.fantasycalc;
+    const proj = player.values?.projection;
     const isExpanded = expandedPlayer === player.player_id;
     const accentClass =
       variant === 'reserve'
@@ -132,91 +159,101 @@ const PlayerRow = memo(
     return (
       <React.Fragment>
         <tr
-          className={`hover:bg-white/4 cursor-pointer border-b border-white/5 transition-colors ${accentClass}`}
+          className={`hover:bg-white/[0.04] cursor-pointer border-b border-white/5 transition-colors ${accentClass}`}
           onClick={() => player.player_id && onPlayerClick(player.player_id)}
         >
-          <td className={`p-2 align-middle ${COL_A}`}>
+          {/* Player */}
+          <td className={`${cellPad} align-middle`}>
             <div className='flex items-center gap-2'>
-              <div className='shrink-0'>
-                <PositionChip player={player} />
-              </div>
-              <span className='text-sm sm:text-base font-medium text-gray-100 leading-tight min-w-0 truncate'>
+              <PositionBadge position={player.position} className='shrink-0' />
+              <span className='min-w-0 truncate text-sm font-medium leading-tight text-ink-hi sm:text-base'>
                 {player.first_name} {player.last_name}
               </span>
               {showTrendingInline && <TrendingChip />}
             </div>
           </td>
 
-          <td className='p-1.5 w-10 text-center align-middle'>
+          {/* Ownership */}
+          <Cell edge>
             {owned != null ? (
-              <span className={`text-sm font-medium tabular-nums ${getOwnershipTier(owned)}`}>
-                {owned}%
-              </span>
+              <span className={`num text-sm font-medium ${getOwnershipTier(owned)}`}>{owned}%</span>
             ) : (
-              <span className='text-sm text-gray-500'>—</span>
+              <NumCell tone='muted'>—</NumCell>
             )}
-          </td>
-
-          <td className={`p-1.5 w-10 text-center align-middle ${COL_A}`}>
+          </Cell>
+          <Cell tint>
             {started != null ? (
-              <span className={`text-sm font-medium tabular-nums ${getOwnershipTier(started)}`}>
+              <span className={`num text-sm font-medium ${getOwnershipTier(started)}`}>
                 {started}%
               </span>
             ) : (
-              <span className='text-sm text-gray-500'>—</span>
+              <NumCell tone='muted'>—</NumCell>
             )}
-          </td>
+          </Cell>
 
-          <td className='p-1.5 w-12 text-center align-middle border-l border-white/10'>
-            <span className='text-sm font-medium tabular-nums text-gray-100'>
-              {formatPoints(stats?.average_points)}
-            </span>
-          </td>
-          <td className={`p-1.5 w-14 text-center align-middle tabular-nums ${COL_A}`}>
-            <span className='text-sm text-gray-100'>{formatPoints(stats?.total_points)}</span>
-          </td>
-          <td className='p-1.5 w-10 text-center align-middle tabular-nums'>
-            <span className='text-sm text-gray-100'>{stats?.games_played ?? '—'}</span>
-          </td>
+          {/* Season */}
+          <Cell edge>
+            <NumCell tone='strong'>{formatPoints(stats?.average_points)}</NumCell>
+          </Cell>
+          <Cell tint>
+            <NumCell>{formatPoints(stats?.total_points)}</NumCell>
+          </Cell>
+          <Cell>
+            <NumCell>{stats?.games_played ?? '—'}</NumCell>
+          </Cell>
 
-          <td className={`p-1.5 w-[70px] text-center align-middle border-l border-white/10 ${COL_A}`}>
-            <span className='text-sm font-medium tabular-nums text-gray-100'>
-              {blendedValue(player) ?? ktcValues?.value ?? '—'}
-            </span>
-            <div className='mt-0.5 flex flex-wrap justify-center gap-0.5'>
-              {valueSources(player).map((s) => (
-                <SourceChip key={s.key} label={s.label} value={s.value} />
-              ))}
-            </div>
-          </td>
+          {/* Proj */}
+          <Cell edge>
+            <NumCell>{formatDecimal(proj?.proj_ros)}</NumCell>
+          </Cell>
+          <Cell tint>
+            <NumCell>{formatDecimal(proj?.proj_week)}</NumCell>
+          </Cell>
 
-          <td className='p-1.5 text-center align-middle whitespace-nowrap'>
-            <div className='text-sm leading-snug'>
-              <div className='text-gray-100 font-medium'>
-                {player.position} {ktcValues?.positionalRank ?? '—'}
-              </div>
-              <div className='text-gray-400 font-medium'>
-                OVR {ktcValues?.rank ?? '—'}
-              </div>
-            </div>
+          {/* Trade value */}
+          <td className={`${cellPad} text-center align-middle ${GROUP_EDGE} min-w-[92px]`}>
+            <ValueCell values={player.values} />
           </td>
+          <Cell>
+            <NumCell>{formatValue(fc?.redraft_value)}</NumCell>
+          </Cell>
+          <Cell tint>
+            <NumCell>{formatCount(fc?.volatility)}</NumCell>
+          </Cell>
+          <Cell>
+            <NumCell>{formatLiquidity(fc?.trade_frequency)}</NumCell>
+          </Cell>
 
-          <td className={`p-1.5 text-center align-middle whitespace-nowrap ${COL_A}`}>
-            <div className='text-sm leading-snug'>
-              <div className='text-gray-100 font-medium'>
-                {player.position} T{ktcValues?.positionalTier ?? '—'}
-              </div>
-              <div className='text-gray-400 font-medium'>
-                OVR T{ktcValues?.overallTier ?? '—'}
-              </div>
-            </div>
-          </td>
+          {/* KTC Rank */}
+          <Cell edge>
+            <NumCell tone='strong'>
+              {ktcValues?.positionalRank != null
+                ? `${player.position}${ktcValues.positionalRank}`
+                : '—'}
+            </NumCell>
+          </Cell>
+          <Cell tint>
+            <NumCell>{formatCount(ktcValues?.rank)}</NumCell>
+          </Cell>
 
-          <td className='p-1.5 w-7 align-middle text-center'>
+          {/* KTC Tier */}
+          <Cell edge>
+            <NumCell tone='strong'>
+              {ktcValues?.positionalTier != null ? `T${ktcValues.positionalTier}` : '—'}
+            </NumCell>
+          </Cell>
+          <Cell tint>
+            <NumCell>
+              {ktcValues?.overallTier != null ? `T${ktcValues.overallTier}` : '—'}
+            </NumCell>
+          </Cell>
+
+          {/* Expand chevron */}
+          <td className='w-7 px-1 align-middle text-center'>
             {isExpanded ? (
-              <ChevronUpIcon className='h-5 w-5 inline' />
+              <ChevronUpIcon className='inline h-5 w-5 text-ink-mid' />
             ) : (
-              <ChevronDownIcon className='h-5 w-5 inline' />
+              <ChevronDownIcon className='inline h-5 w-5 text-ink-mid' />
             )}
           </td>
         </tr>
@@ -232,6 +269,40 @@ const PlayerRow = memo(
       </React.Fragment>
     );
   }
+);
+
+/** Leaf-column header cell wrapping a tooltip-capable ColumnHeader. */
+const LeafTh = ({
+  label,
+  tip,
+  tint = false,
+  edge = false,
+}: {
+  label: string;
+  tip: string;
+  tint?: boolean;
+  edge?: boolean;
+}) => (
+  <th
+    className={`${cellPad} ${tint ? COL_A : ''} ${edge ? GROUP_EDGE : ''}`}
+    scope='col'
+  >
+    <ColumnHeader label={label} tooltip={tip} />
+  </th>
+);
+
+const GroupTh = ({
+  label,
+  tip,
+  span,
+}: {
+  label: string;
+  tip: string;
+  span: number;
+}) => (
+  <th colSpan={span} scope='colgroup' className={`${cellPad} ${GROUP_EDGE}`}>
+    <ColumnHeader label={label} tooltip={tip} variant='group' />
+  </th>
 );
 
 export interface RosterTableProps {
@@ -269,48 +340,52 @@ export const RosterTable = memo(
       researchWeek,
     };
     return (
-      <div className='rounded-md overflow-x-auto border border-white/[0.07]'>
+      <div className='overflow-x-auto rounded-md border border-line-soft bg-surface-raised'>
         <table className='min-w-full border-collapse'>
-          <thead className='bg-[#0d1e2e]'>
-            <tr className='border-b border-white/8'>
-              <th className={`${theadSticky} p-2 text-left ${thBase} ${COL_A}`}>Player</th>
-              <th className={`${theadSticky} p-1.5 w-10 text-center ${thBase}`}>Own</th>
-              <th className={`${theadSticky} p-1.5 w-10 text-center ${thBase} ${COL_A}`}>Start</th>
-              <th
-                colSpan={3}
-                scope='colgroup'
-                className={`${theadSticky} border-l border-white/10 p-1.5 ${thBase}`}
-              >
-                <div className='flex flex-col items-stretch gap-1'>
-                  <div className='text-center text-[10px] sm:text-xs font-medium tracking-wide text-gray-400'>
-                    Season Stats
-                  </div>
-                  <div className='h-px w-full bg-white/20' aria-hidden />
-                  <div className='grid gap-1 grid-cols-3'>
-                    <div className='text-center'>Avg</div>
-                    <div className={`text-center ${COL_A}`}>Total</div>
-                    <div className='text-center'>GP</div>
-                  </div>
-                </div>
+          <thead className='sticky top-0 z-20 bg-surface-header'>
+            <tr className='border-b border-line-soft'>
+              <th rowSpan={2} scope='col' className={`${cellPad} text-left`}>
+                <ColumnHeader label='Player' tooltip='Player — position and name' align='left' />
               </th>
-              <th
-                colSpan={3}
-                scope='colgroup'
-                className={`${theadSticky} border-l border-white/10 p-1.5 ${thBase}`}
-              >
-                <div className='flex flex-col items-stretch gap-1'>
-                  <div className='text-center text-[10px] sm:text-xs font-medium tracking-wide text-gray-400'>
-                    KTC
-                  </div>
-                  <div className='h-px w-full bg-white/20' aria-hidden />
-                  <div className='grid gap-1 grid-cols-[minmax(2.75rem,3.25rem)_1fr_1fr]'>
-                    <div className={`text-center ${COL_A}`}>Value</div>
-                    <div className='text-center'>Rank</div>
-                    <div className={`text-center ${COL_A}`}>Tier</div>
-                  </div>
-                </div>
-              </th>
-              <th className={`${theadSticky} w-7`} aria-hidden />
+              <GroupTh label='Ownership' tip='Sleeper ownership across leagues' span={2} />
+              <GroupTh label='Season' tip='Regular-season fantasy stats' span={3} />
+              <GroupTh label='Proj' tip='Projected fantasy points' span={2} />
+              <GroupTh
+                label='Trade value'
+                tip='Trade values blended from KTC and FantasyCalc'
+                span={4}
+              />
+              <GroupTh label='KTC Rank' tip='KeepTradeCut rankings' span={2} />
+              <GroupTh label='KTC Tier' tip='KeepTradeCut tiers' span={2} />
+              <th rowSpan={2} className='w-7' aria-hidden />
+            </tr>
+            <tr className='border-b border-line'>
+              <LeafTh label='Own' tip='Owned — % of leagues rostering this player' edge />
+              <LeafTh label='Start' tip='Started — % of leagues starting this player' tint />
+              <LeafTh label='Avg' tip='Average fantasy points per game this season' edge />
+              <LeafTh label='Tot' tip='Total fantasy points this season' tint />
+              <LeafTh label='GP' tip='Games played this season' />
+              <LeafTh label='ROS' tip='Rest-of-season projected fantasy points' edge />
+              <LeafTh label='Wk' tip="Next week's projected fantasy points" tint />
+              <LeafTh
+                label='Consensus'
+                tip='Consensus value — average of KTC and FantasyCalc. Arrow shows the 30-day trend.'
+                edge
+              />
+              <LeafTh label='Redraft' tip='FantasyCalc redraft (win-now) value' />
+              <LeafTh
+                label='Vol'
+                tip='FantasyCalc value volatility — higher means a less settled price'
+                tint
+              />
+              <LeafTh
+                label='Liq'
+                tip='Trade liquidity — how frequently this player is traded (FantasyCalc)'
+              />
+              <LeafTh label='Pos' tip='KTC positional rank' edge />
+              <LeafTh label='Ovr' tip='KTC overall rank' tint />
+              <LeafTh label='Pos' tip='KTC positional tier' edge />
+              <LeafTh label='Ovr' tip='KTC overall tier' tint />
             </tr>
           </thead>
           <tbody>
@@ -326,29 +401,15 @@ export const RosterTable = memo(
               <>
                 <SectionDivider label='Taxi' count={taxi.length} variant='taxi' />
                 {taxi.map((p) => (
-                  <PlayerRow
-                    key={p.player_id}
-                    player={p}
-                    variant='taxi'
-                    {...rowProps}
-                  />
+                  <PlayerRow key={p.player_id} player={p} variant='taxi' {...rowProps} />
                 ))}
               </>
             )}
             {reserve.length > 0 && (
               <>
-                <SectionDivider
-                  label='Reserve / IR'
-                  count={reserve.length}
-                  variant='reserve'
-                />
+                <SectionDivider label='Reserve / IR' count={reserve.length} variant='reserve' />
                 {reserve.map((p) => (
-                  <PlayerRow
-                    key={p.player_id}
-                    player={p}
-                    variant='reserve'
-                    {...rowProps}
-                  />
+                  <PlayerRow key={p.player_id} player={p} variant='reserve' {...rowProps} />
                 ))}
               </>
             )}

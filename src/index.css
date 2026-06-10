@@ -74,25 +74,6 @@ body {
   max-width: 70%;
 }
 
-/* Display type — Saira Condensed for headings, group labels, column heads. */
-.hd {
-  font-family: var(--font-display);
-  letter-spacing: 0.01em;
-}
-
-/* Small uppercase label (column heads, field labels). */
-.lbl {
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-}
-
-/* Aligned figures for every number cell (IBM Plex tabular + slashed zero). */
-.num {
-  font-variant-numeric: tabular-nums slashed-zero;
-}
-
 @media (max-width: 768px) {
   body {
     max-width: 100%;
@@ -358,4 +339,26 @@ button.posture-toggle:disabled {
   .league-standings-heading {
     color: #111827;
   }
+}
+
+/* Display/number utilities — kept at end so equal-specificity wins over the
+ * unlayered template resets above (e.g. .btn-ghost font-weight: inherit). */
+
+/* Saira Condensed for headings, group labels, column heads. */
+.hd {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+/* Small uppercase label (column heads, field labels). */
+.lbl {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+/* Aligned figures for every number cell (IBM Plex tabular + slashed zero). */
+.num {
+  font-variant-numeric: tabular-nums slashed-zero;
 }

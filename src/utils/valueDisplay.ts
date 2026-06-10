@@ -82,6 +82,15 @@ export function formatCount(n: number | null | undefined): string {
   return String(Math.round(n));
 }
 
+/**
+ * Trade liquidity from FantasyCalc `trade_frequency` (a small fraction, e.g.
+ * 0.0073). Shown as a percentage so the tiny raw value reads cleanly.
+ */
+export function formatLiquidity(n: number | null | undefined): string {
+  if (n == null || Number.isNaN(n)) return '—';
+  return `${(n * 100).toFixed(2)}%`;
+}
+
 // ---------------------------------------------------------------------------
 // 30-day trend
 // ---------------------------------------------------------------------------

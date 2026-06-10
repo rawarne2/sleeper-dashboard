@@ -1,11 +1,24 @@
-const chipBase =
-  'inline-flex items-baseline gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium leading-tight bg-white/5';
+import { sourceMeta, formatValue } from '../utils/valueDisplay';
 
-export function SourceChip({ label, value }: { label: string; value: number | string | null }) {
+/**
+ * Color-coded source value (KTC teal / FC violet) shown beneath the Consensus
+ * hero. The label takes the source accent; the figure stays neutral.
+ */
+export function SourceChip({
+  sourceKey,
+  value,
+}: {
+  sourceKey: 'ktc' | 'fantasycalc';
+  value: number | null;
+}) {
+  const meta = sourceMeta(sourceKey);
   return (
-    <span className={chipBase} title={`${label}: ${value ?? '—'}`}>
-      <span className='shrink-0 text-gray-400'>{label}</span>
-      <span className='tabular-nums text-gray-200'>{value ?? '—'}</span>
+    <span
+      className='inline-flex items-baseline gap-1 text-[10px] leading-none'
+      title={`${meta?.fullLabel ?? sourceKey}: ${value != null ? formatValue(value) : '—'}`}
+    >
+      <span className={`font-semibold ${meta?.textClass ?? ''}`}>{meta?.label ?? sourceKey}</span>
+      <span className='num text-ink'>{value != null ? formatValue(value) : '—'}</span>
     </span>
   );
 }
