@@ -1,12 +1,96 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+ * Design tokens (Tailwind v4 @theme)
+ *
+ * Registering these as `--color-*` / `--font-*` does double duty: Tailwind
+ * generates utilities (bg-cons, text-ktc, font-display, …) AND emits each as a
+ * :root CSS variable, so `var(--color-cons)` works in inline styles too.
+ *
+ * The legacy `primary-*` / `background-*` names below back the utility classes
+ * that were referenced across the app but never defined (no-ops until now).
+ * ======================================================================== */
+@theme {
+  /* Typography */
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Saira Condensed', 'IBM Plex Sans', system-ui, sans-serif;
+
+  /* Legacy accent + surfaces (resolve previously-undefined utilities) */
+  --color-primary-main: #7cc4fb;
+  --color-primary-light: #b6ddfd;
+  --color-primary-dark: #4a9fe0;
+  --color-background-default: #0a1929;
+  --color-background-paper: #0e2034;
+
+  /* Redesign surfaces (low → high volatility reading order) */
+  --color-surface-base: #0a1929;
+  --color-surface-raised: #0e2034;
+  --color-surface-card: #16293c;
+  --color-surface-header: #0d1e2e;
+  --color-surface-overlay: #0b1a28;
+
+  /* Hairlines */
+  --color-line-soft: rgba(255, 255, 255, 0.06);
+  --color-line: rgba(255, 255, 255, 0.1);
+  --color-line-strong: rgba(255, 255, 255, 0.18);
+
+  /* Text tiers */
+  --color-ink-hi: #f1f5f9;
+  --color-ink: #cbd5e1;
+  --color-ink-mid: #94a3b8;
+  --color-ink-dim: #64748b;
+
+  /* Value-source accents */
+  --color-cons: #38bdf8; /* sky — Consensus (KTC+FC blend) */
+  --color-ktc: #2dd4bf;  /* teal — KeepTradeCut */
+  --color-fc: #a78bfa;   /* violet — FantasyCalc */
+
+  /* 30-day trend */
+  --color-trend-up: #34d399;
+  --color-trend-down: #f87171;
+  --color-trend-flat: #94a3b8;
+
+  /* Position accents (mirror .player-chip-* below) */
+  --color-pos-qb: #ef4444;
+  --color-pos-rb: #22c55e;
+  --color-pos-wr: #3b83f6;
+  --color-pos-te: #f59f0b;
+  --color-pos-k: #a955f7;
+  --color-pos-def: #06b5d4;
+}
+
+/* Guarantee token-driven utilities exist even when class names are composed
+ * dynamically (e.g. `text-pos-${token}`) and never appear as full literals. */
+@source inline("{text,bg,border}-{cons,ktc,fc}");
+@source inline("{text,bg,border}-trend-{up,down,flat}");
+@source inline("{text,bg,border}-pos-{qb,rb,wr,te,k,def}");
+
 /* Custom base styles */
 body {
   color: white;
-  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  font-family: var(--font-sans);
   margin: 0 auto;
   padding: 0;
   max-width: 70%;
+}
+
+/* Display type — Saira Condensed for headings, group labels, column heads. */
+.hd {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+/* Small uppercase label (column heads, field labels). */
+.lbl {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+/* Aligned figures for every number cell (IBM Plex tabular + slashed zero). */
+.num {
+  font-variant-numeric: tabular-nums slashed-zero;
 }
 
 @media (max-width: 768px) {
