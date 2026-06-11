@@ -15,12 +15,10 @@
   --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Saira Condensed', 'IBM Plex Sans', system-ui, sans-serif;
 
-  /* Legacy accent + surfaces (resolve previously-undefined utilities) */
+  /* UI accent (was a previously-undefined utility; now the app's accent token) */
   --color-primary-main: #7cc4fb;
   --color-primary-light: #b6ddfd;
   --color-primary-dark: #4a9fe0;
-  --color-background-default: #0a1929;
-  --color-background-paper: #0e2034;
 
   /* Redesign surfaces (low → high volatility reading order) */
   --color-surface-base: #0a1929;

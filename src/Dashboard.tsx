@@ -158,7 +158,7 @@ const Dashboard: React.FC = () => {
 
   if (!leagueIdReady) {
     return (
-      <div className='bg-background-default text-white min-h-screen p-3 flex flex-col justify-center items-center gap-3'>
+      <div className='bg-surface-base text-white min-h-screen p-3 flex flex-col justify-center items-center gap-3'>
         <div className='animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-main' />
         <div className='text-gray-300'>Loading saved preferences…</div>
       </div>
@@ -167,7 +167,7 @@ const Dashboard: React.FC = () => {
 
   if (!selectedLeagueId) {
     return (
-      <div className='bg-background-default text-white min-h-screen relative'>
+      <div className='bg-surface-base text-white min-h-screen relative'>
         <div className='absolute inset-0 bg-black/55 backdrop-blur-[2px]' aria-hidden />
         <div
           className='relative z-10 flex min-h-screen items-center justify-center p-4'
@@ -192,7 +192,7 @@ const Dashboard: React.FC = () => {
 
   if (error) {
     return (
-      <div className='bg-background-default text-white min-h-screen p-3 flex flex-col justify-center items-center gap-4'>
+      <div className='bg-surface-base text-white min-h-screen p-3 flex flex-col justify-center items-center gap-4'>
         <div className='text-xl text-red-500 text-center max-w-lg'>{error}</div>
         <button
           type='button'
@@ -271,7 +271,7 @@ const Dashboard: React.FC = () => {
   ) : null;
 
   return (
-    <div className='bg-background-default text-white min-h-screen flex flex-col w-full'>
+    <div className='bg-surface-base text-white min-h-screen flex flex-col w-full'>
       {legendOpen && <LegendModal onClose={() => setLegendOpen(false)} />}
 
       {leaguePickerOpen ? (
@@ -355,7 +355,7 @@ const Dashboard: React.FC = () => {
       <div className='flex-1'>
         {/* All Players is standalone — it must not wait on the league bundle. */}
         {activeTab === 'all-players' ? (
-          <div className='bg-background-paper py-4 sm:py-5'>
+          <div className='bg-surface-raised py-4 sm:py-5'>
             <AllPlayersPage />
           </div>
         ) : loading ? (
@@ -366,7 +366,7 @@ const Dashboard: React.FC = () => {
         ) : (
           <div className='grid grid-cols-1 gap-4'>
             {activeTab === 'standings' ? (
-              <div className='bg-background-paper justify-center rounded-lg'>
+              <div className='bg-surface-raised justify-center rounded-lg'>
                 <div className='league-standings-heading text-lg sm:text-2xl font-semibold text-primary-main text-center mt-4 mb-2 sm:mt-6 sm:mb-2.5'>
                   League Standings
                 </div>
@@ -374,7 +374,7 @@ const Dashboard: React.FC = () => {
                 {renderTeamList()}
               </div>
             ) : (
-              <div className='bg-background-paper py-4 sm:py-5'>
+              <div className='bg-surface-raised py-4 sm:py-5'>
                 <TradeAnalyzerPage />
               </div>
             )}
@@ -382,7 +382,7 @@ const Dashboard: React.FC = () => {
         )}
       </div>
 
-      <div className='py-3 px-2 mt-auto bg-background-paper/70 text-center'>
+      <div className='py-3 px-2 mt-auto bg-surface-raised/70 text-center'>
         <div className='text-sm text-gray-400'>
           Sleeper Dynasty League Dashboard
           {league?.name ? ` · ${league.name}` : ''} · ID: {selectedLeagueId}
