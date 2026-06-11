@@ -122,7 +122,7 @@ export function ColumnHeader({
         aria-describedby={open ? tipId : undefined}
         className={`btn-ghost lbl inline-flex w-full items-center gap-1 leading-tight text-ink-mid ${
           ALIGN_CLASS[align]
-        } ${variant === 'group' ? 'text-[11px]' : 'text-[10px]'} ${
+        } ${variant === 'group' ? '!text-[12px]' : '!text-[11px]'} ${
           interactive ? 'cursor-help hover:text-ink' : ''
         } ${sortDirection ? 'text-ink-hi' : ''} ${className}`}
       >

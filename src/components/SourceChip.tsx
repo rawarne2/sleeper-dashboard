@@ -14,7 +14,7 @@ export function SourceChip({
   const meta = sourceMeta(sourceKey);
   return (
     <span
-      className='inline-flex items-baseline gap-1 text-[10px] leading-none'
+      className='inline-flex items-baseline gap-1 text-[11px] leading-none'
       title={`${meta?.fullLabel ?? sourceKey}: ${value != null ? formatValue(value) : '—'}`}
     >
       <span className={`font-semibold ${meta?.textClass ?? ''}`}>{meta?.label ?? sourceKey}</span>

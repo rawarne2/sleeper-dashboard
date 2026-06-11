@@ -30,7 +30,7 @@ function resolveOwnership(player: Player, ownershipMap: OwnershipMap) {
 }
 
 const TrendingChip = () => (
-  <span className='ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide bg-amber-500/15 text-amber-300 border border-amber-500/30'>
+  <span className='ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide bg-amber-500/15 text-amber-300 border border-amber-500/30'>
     Trending
   </span>
 );
@@ -55,7 +55,7 @@ const PlayerDetailRow = memo(({
 }) => (
   <tr>
     <td colSpan={TOTAL_COLS} className='p-0 align-top'>
-      <div className='player-detail-row'>
+      <div className='player-detail-row sticky left-0'>
         <PlayerDetailContent
           player={player}
           bundleSeason={bundleSeason}
@@ -159,11 +159,11 @@ const PlayerRow = memo(
     return (
       <React.Fragment>
         <tr
-          className={`hover:bg-white/[0.04] cursor-pointer border-b border-white/5 transition-colors ${accentClass}`}
+          className={`group hover:bg-white/[0.04] cursor-pointer border-b border-white/5 transition-colors ${accentClass}`}
           onClick={() => player.player_id && onPlayerClick(player.player_id)}
         >
-          {/* Player */}
-          <td className={`${cellPad} align-middle`}>
+          {/* Player — sticky left so it stays pinned during horizontal scroll */}
+          <td className={`${cellPad} align-middle sticky left-0 z-10 bg-[#0e2034] group-hover:bg-[#162640] border-r border-line`}>
             <div className='flex items-center gap-2'>
               <PositionBadge position={player.position} className='shrink-0' />
               <span className='min-w-0 truncate text-sm font-medium leading-tight text-ink-hi sm:text-base'>
@@ -344,7 +344,11 @@ export const RosterTable = memo(
         <table className='min-w-full border-collapse'>
           <thead className='sticky top-0 z-20 bg-surface-header'>
             <tr className='border-b border-line-soft'>
-              <th rowSpan={2} scope='col' className={`${cellPad} text-left`}>
+              <th
+                rowSpan={2}
+                scope='col'
+                className={`${cellPad} text-left sticky left-0 z-30 bg-surface-header border-r border-line`}
+              >
                 <ColumnHeader label='Player' tooltip='Player — position and name' align='left' />
               </th>
               <GroupTh label='Ownership' tip='Sleeper ownership across leagues' span={2} />

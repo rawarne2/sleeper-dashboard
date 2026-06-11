@@ -38,7 +38,7 @@ const DetailGroup = ({
   compact?: boolean;
 }) => (
   <div className={detailGroupShell(compact)}>
-    <div className='mb-1.5 text-[10px] uppercase tracking-wide text-gray-400'>{title}</div>
+    <div className='mb-1.5 text-[11px] uppercase tracking-wide text-gray-400'>{title}</div>
     <div className='flex flex-col gap-1 text-sm'>{children}</div>
   </div>
 );
@@ -82,7 +82,7 @@ const DetailItem = ({
 /** Label-over-value cell for the static profile grid (roster expand). */
 const StaticField = ({ label, value }: { label: string; value: React.ReactNode }) => (
   <div className='flex min-w-0 flex-col gap-0.5'>
-    <span className='lbl text-[10px] text-ink-mid'>{label}</span>
+    <span className='lbl text-[11px] text-ink-mid'>{label}</span>
     <span className='truncate text-sm text-ink-hi' title={typeof value === 'string' ? value : undefined}>
       {value == null || value === '' ? '—' : value}
     </span>
@@ -222,7 +222,7 @@ export const PlayerDetailContent = memo(({
                   : 'border-amber-500/30 bg-amber-500/10 text-amber-200'
               }`}
             >
-              <span className='lbl shrink-0 text-[10px] text-ink-mid'>Injury · {injury.source}</span>
+              <span className='lbl shrink-0 text-[11px] text-ink-mid'>Injury · {injury.source}</span>
               <span className='min-w-0'>{injury.text}</span>
             </div>
           )}

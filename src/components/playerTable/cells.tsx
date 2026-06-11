@@ -22,7 +22,7 @@ export function ValueCell({ values }: { values?: ValuesBlock | null }) {
         </span>
         {trend && (
           <span
-            className={`shrink-0 text-[10px] font-semibold leading-none ${trend.textClass}`}
+            className={`shrink-0 text-[11px] font-semibold leading-none ${trend.textClass}`}
             title={trend.label}
             aria-label={trend.label}
           >
