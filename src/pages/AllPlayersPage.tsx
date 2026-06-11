@@ -16,31 +16,33 @@ import {
 } from '../utils/leagueConfig';
 import {
   formatValue,
-  formatDecimal,
+  formatCount,
+  formatLiquidity,
   POSITION_ORDER,
   positionColorVar,
-  sourceMeta,
 } from '../utils/valueDisplay';
 import { getOwnershipTier } from '../utils/teamStats';
 import { ColumnHeader, type SortDirection } from '../components/playerTable/ColumnHeader';
 import { PositionBadge } from '../components/playerTable/PositionBadge';
-import { NumCell, TrendCell } from '../components/playerTable/cells';
+import { ValueCell, NumCell } from '../components/playerTable/cells';
 
-type SortKey = 'rank' | 'consensus' | 'ktc' | 'fc' | 'trend' | 'own' | 'ros';
+type SortKey = 'consensus' | 'redraft' | 'vol' | 'liq' | 'rank' | 'tier' | 'own';
 
 const cellPad = 'px-1.5 py-1.5';
 const GROUP_EDGE = 'border-l border-line';
+const COL_A = 'bg-white/[0.025]';
 
 interface Row {
   player: Player;
   consensus: number | null;
-  ktc: number | null;
-  fc: number | null;
-  trend: number | null;
+  redraft: number | null;
+  vol: number | null;
+  liq: number | null;
   own: number | null;
-  ros: number | null;
   overallRank: number | null;
+  overallTier: number | null;
   posRank: string;
+  posTier: string;
 }
 
 const PostureToggle = ({
@@ -125,14 +127,15 @@ export default function AllPlayersPage() {
       return {
         player,
         consensus: v?.blended ?? null,
-        ktc: v?.sources?.ktc?.value ?? null,
-        fc: fc?.value ?? null,
-        trend: fc?.trend_30day ?? null,
+        redraft: fc?.redraft_value ?? null,
+        vol: fc?.volatility ?? null,
+        liq: fc?.trade_frequency ?? null,
         own: ownEntry?.owned ?? player.research_latest?.owned ?? null,
-        ros: v?.projection?.proj_ros ?? null,
         overallRank: ktcv?.rank ?? null,
+        overallTier: ktcv?.overallTier ?? null,
         posRank:
           ktcv?.positionalRank != null ? `${player.position}${ktcv.positionalRank}` : '—',
+        posTier: ktcv?.positionalTier != null ? `T${ktcv.positionalTier}` : '—',
       };
     });
   }, [players, playerOwnership]);
@@ -153,18 +156,18 @@ export default function AllPlayersPage() {
     const dir = sortDir === 'asc' ? 1 : -1;
     const get = (r: Row): number | null => {
       switch (sortKey) {
+        case 'redraft':
+          return r.redraft;
+        case 'vol':
+          return r.vol;
+        case 'liq':
+          return r.liq;
         case 'rank':
           return r.overallRank;
-        case 'ktc':
-          return r.ktc;
-        case 'fc':
-          return r.fc;
-        case 'trend':
-          return r.trend;
+        case 'tier':
+          return r.overallTier;
         case 'own':
           return r.own;
-        case 'ros':
-          return r.ros;
         default:
           return r.consensus;
       }
@@ -180,36 +183,36 @@ export default function AllPlayersPage() {
     });
   }, [rows, deferredQuery, position, sortKey, sortDir]);
 
-  const onSort = useCallback(
-    (key: SortKey, defaultDir: 'asc' | 'desc') => {
-      setSortKey((prev) => {
-        if (prev === key) {
-          setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-          return prev;
-        }
-        setSortDir(defaultDir);
-        return key;
-      });
-    },
-    []
-  );
+  const onSort = useCallback((key: SortKey, defaultDir: 'asc' | 'desc') => {
+    setSortKey((prev) => {
+      if (prev === key) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        return prev;
+      }
+      setSortDir(defaultDir);
+      return key;
+    });
+  }, []);
 
   const dirFor = (key: SortKey): SortDirection => (sortKey === key ? sortDir : null);
 
+  /** Sortable leaf header cell. */
   const SortTh = ({
     label,
     tip,
     k,
     defaultDir = 'desc',
+    tint = false,
     edge = false,
   }: {
     label: string;
     tip: string;
     k: SortKey;
     defaultDir?: 'asc' | 'desc';
+    tint?: boolean;
     edge?: boolean;
   }) => (
-    <th className={`${cellPad} ${edge ? GROUP_EDGE : ''}`} scope='col'>
+    <th className={`${cellPad} ${tint ? COL_A : ''} ${edge ? GROUP_EDGE : ''}`} scope='col'>
       <ColumnHeader
         label={label}
         tooltip={tip}
@@ -217,6 +220,19 @@ export default function AllPlayersPage() {
         sortDirection={dirFor(k)}
         onSort={() => onSort(k, defaultDir)}
       />
+    </th>
+  );
+
+  const GroupTh = ({ label, tip, span }: { label: string; tip: string; span: number }) => (
+    <th colSpan={span} scope='colgroup' className={`${cellPad} ${GROUP_EDGE}`}>
+      <ColumnHeader label={label} tooltip={tip} variant='group' />
+    </th>
+  );
+
+  /** Plain (non-sortable) leaf header. */
+  const PlainTh = ({ label, tip }: { label: string; tip: string }) => (
+    <th className={cellPad} scope='col'>
+      <ColumnHeader label={label} tooltip={tip} />
     </th>
   );
 
@@ -253,9 +269,7 @@ export default function AllPlayersPage() {
               { label: 'No TEP', value: '' },
             ]}
             value={config.tep_level === '' ? '' : 'tep'}
-            onChange={(v) =>
-              setConfig((c) => ({ ...c, tep_level: v as KtcConfig['tep_level'] }))
-            }
+            onChange={(v) => setConfig((c) => ({ ...c, tep_level: v as KtcConfig['tep_level'] }))}
           />
         </div>
 
@@ -276,9 +290,7 @@ export default function AllPlayersPage() {
                 type='button'
                 onClick={() => setPosition(pos)}
                 className={`lbl rounded-full border px-3 py-1 text-[11px] transition-colors ${
-                  active
-                    ? 'border-transparent text-ink-hi'
-                    : 'border-line text-ink-mid hover:text-ink'
+                  active ? 'border-transparent text-ink-hi' : 'border-line text-ink-mid hover:text-ink'
                 }`}
                 style={
                   active
@@ -306,34 +318,51 @@ export default function AllPlayersPage() {
         <div className='overflow-x-auto rounded-md border border-line-soft bg-surface-raised'>
           <table className='min-w-full border-collapse'>
             <thead className='sticky top-0 z-20 bg-surface-header'>
-              <tr className='border-b border-line'>
-                <th className={`${cellPad} text-right`} scope='col'>
+              <tr className='border-b border-line-soft'>
+                <th rowSpan={2} className={`${cellPad} text-right`} scope='col'>
                   <ColumnHeader label='#' tooltip='Row number in the current sort' align='right' />
                 </th>
                 <th
+                  rowSpan={2}
                   className={`${cellPad} sticky left-0 z-30 bg-surface-header text-left`}
                   scope='col'
                 >
-                  <ColumnHeader label='Player' tooltip='Player name' align='left' />
+                  <ColumnHeader label='Player' tooltip='Player — position and name' align='left' />
                 </th>
-                <th className={cellPad} scope='col'>
-                  <ColumnHeader label='Pos' tooltip='Position' />
-                </th>
-                <th className={cellPad} scope='col'>
+                <th rowSpan={2} className={cellPad} scope='col'>
                   <ColumnHeader label='Team' tooltip='NFL team' />
                 </th>
+                <GroupTh
+                  label='Trade value'
+                  tip='Trade values blended from KTC and FantasyCalc'
+                  span={4}
+                />
+                <GroupTh label='KTC Rank' tip='KeepTradeCut rankings' span={2} />
+                <GroupTh label='KTC Tier' tip='KeepTradeCut tiers' span={2} />
+                <th rowSpan={2} className={`${cellPad} ${GROUP_EDGE}`} scope='col'>
+                  <ColumnHeader
+                    label='Own'
+                    tooltip='Owned — % of leagues rostering this player (when a league is loaded)'
+                    sortable
+                    sortDirection={dirFor('own')}
+                    onSort={() => onSort('own', 'desc')}
+                  />
+                </th>
+              </tr>
+              <tr className='border-b border-line'>
                 <SortTh
                   label='Consensus'
-                  tip='Consensus value — average of KTC and FantasyCalc'
+                  tip='Consensus value — average of KTC and FantasyCalc. Arrow shows the 30-day trend.'
                   k='consensus'
                   edge
                 />
-                <SortTh label='KTC' tip='KeepTradeCut value' k='ktc' />
-                <SortTh label='FC' tip='FantasyCalc value' k='fc' />
-                <SortTh label='30D' tip='30-day FantasyCalc trend' k='trend' />
-                <SortTh label='Own' tip='Ownership % (from the loaded league, if any)' k='own' edge />
-                <SortTh label='ROS' tip='Rest-of-season projected points' k='ros' />
-                <SortTh label='Rank' tip='KTC positional rank · sort by overall rank' k='rank' defaultDir='asc' edge />
+                <SortTh label='Redraft' tip='FantasyCalc redraft (win-now) value' k='redraft' />
+                <SortTh label='Vol' tip='FantasyCalc value volatility' k='vol' tint />
+                <SortTh label='Liq' tip='Trade liquidity — how often this player is traded' k='liq' />
+                <PlainTh label='Pos' tip='KTC positional rank' />
+                <SortTh label='Ovr' tip='KTC overall rank' k='rank' defaultDir='asc' tint />
+                <PlainTh label='Pos' tip='KTC positional tier' />
+                <SortTh label='Ovr' tip='KTC overall tier' k='tier' defaultDir='asc' tint />
               </tr>
             </thead>
             <tbody>
@@ -342,41 +371,47 @@ export default function AllPlayersPage() {
                   key={r.player.player_id ?? i}
                   className='group border-b border-white/5 hover:bg-white/[0.04]'
                 >
-                  <td className={`${cellPad} text-right`}>
+                  <td className={`${cellPad} text-right align-middle`}>
                     <NumCell tone='muted'>{i + 1}</NumCell>
                   </td>
                   <td
-                    className={`${cellPad} sticky left-0 z-10 bg-[#0e2034] group-hover:bg-[#162640] border-r border-line`}
+                    className={`${cellPad} align-middle sticky left-0 z-10 bg-[#0e2034] group-hover:bg-[#162640] border-r border-line`}
                   >
-                    <span className='truncate text-sm font-medium text-ink-hi'>
-                      {r.player.playerName}
-                    </span>
+                    <div className='flex items-center gap-2'>
+                      <PositionBadge position={r.player.position} className='shrink-0' />
+                      <span className='min-w-0 truncate text-sm font-medium text-ink-hi'>
+                        {r.player.playerName}
+                      </span>
+                    </div>
                   </td>
-                  <td className={`${cellPad} text-center`}>
-                    <PositionBadge position={r.player.position} />
-                  </td>
-                  <td className={`${cellPad} text-center`}>
+                  <td className={`${cellPad} text-center align-middle`}>
                     <NumCell tone='muted'>{r.player.team || '—'}</NumCell>
                   </td>
-                  <td className={`${cellPad} text-center ${GROUP_EDGE}`}>
-                    <span className='num text-sm font-semibold text-ink-hi'>
-                      {formatValue(r.consensus)}
-                    </span>
+                  <td className={`${cellPad} text-center align-middle ${GROUP_EDGE} min-w-[92px]`}>
+                    <ValueCell values={r.player.values} />
                   </td>
-                  <td className={`${cellPad} text-center`}>
-                    <span className={`num text-sm ${sourceMeta('ktc')?.textClass}`}>
-                      {formatValue(r.ktc)}
-                    </span>
+                  <td className={`${cellPad} text-center align-middle`}>
+                    <NumCell>{formatValue(r.redraft)}</NumCell>
                   </td>
-                  <td className={`${cellPad} text-center`}>
-                    <span className={`num text-sm ${sourceMeta('fantasycalc')?.textClass}`}>
-                      {formatValue(r.fc)}
-                    </span>
+                  <td className={`${cellPad} text-center align-middle ${COL_A}`}>
+                    <NumCell>{formatCount(r.vol)}</NumCell>
                   </td>
-                  <td className={`${cellPad} text-center`}>
-                    <TrendCell trend30={r.trend} />
+                  <td className={`${cellPad} text-center align-middle`}>
+                    <NumCell>{formatLiquidity(r.liq)}</NumCell>
                   </td>
-                  <td className={`${cellPad} text-center ${GROUP_EDGE}`}>
+                  <td className={`${cellPad} text-center align-middle ${GROUP_EDGE}`}>
+                    <NumCell tone='strong'>{r.posRank}</NumCell>
+                  </td>
+                  <td className={`${cellPad} text-center align-middle ${COL_A}`}>
+                    <NumCell>{formatCount(r.overallRank)}</NumCell>
+                  </td>
+                  <td className={`${cellPad} text-center align-middle ${GROUP_EDGE}`}>
+                    <NumCell tone='strong'>{r.posTier}</NumCell>
+                  </td>
+                  <td className={`${cellPad} text-center align-middle ${COL_A}`}>
+                    <NumCell>{r.overallTier != null ? `T${r.overallTier}` : '—'}</NumCell>
+                  </td>
+                  <td className={`${cellPad} text-center align-middle ${GROUP_EDGE}`}>
                     {r.own != null ? (
                       <span className={`num text-sm font-medium ${getOwnershipTier(r.own)}`}>
                         {r.own}%
@@ -384,12 +419,6 @@ export default function AllPlayersPage() {
                     ) : (
                       <NumCell tone='muted'>—</NumCell>
                     )}
-                  </td>
-                  <td className={`${cellPad} text-center`}>
-                    <NumCell>{formatDecimal(r.ros)}</NumCell>
-                  </td>
-                  <td className={`${cellPad} text-center ${GROUP_EDGE}`}>
-                    <NumCell tone='strong'>{r.posRank}</NumCell>
                   </td>
                 </tr>
               ))}
