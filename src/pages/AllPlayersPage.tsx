@@ -151,25 +151,33 @@ export default function AllPlayersPage() {
       );
     }
     const dir = sortDir === 'asc' ? 1 : -1;
-    const get = (r: Row): number => {
+    const get = (r: Row): number | null => {
       switch (sortKey) {
         case 'rank':
-          return r.overallRank ?? Number.POSITIVE_INFINITY * -dir;
+          return r.overallRank;
         case 'ktc':
-          return r.ktc ?? -Infinity;
+          return r.ktc;
         case 'fc':
-          return r.fc ?? -Infinity;
+          return r.fc;
         case 'trend':
-          return r.trend ?? -Infinity;
+          return r.trend;
         case 'own':
-          return r.own ?? -Infinity;
+          return r.own;
         case 'ros':
-          return r.ros ?? -Infinity;
+          return r.ros;
         default:
-          return r.consensus ?? -Infinity;
+          return r.consensus;
       }
     };
-    return [...out].sort((a, b) => (get(a) - get(b)) * dir);
+    // Missing values always sort last, regardless of direction.
+    return [...out].sort((a, b) => {
+      const av = get(a);
+      const bv = get(b);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return (av - bv) * dir;
+    });
   }, [rows, deferredQuery, position, sortKey, sortDir]);
 
   const onSort = useCallback(
