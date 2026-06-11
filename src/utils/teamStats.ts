@@ -31,7 +31,14 @@ export function formatBirthDate(birthDate: string): string {
 }
 
 export function formatHeight(player: Player): string {
-  return player.height && player.height.trim().length > 0 ? player.height : 'N/A';
+  const h = player.height?.trim();
+  if (!h) return 'N/A';
+  // Sleeper stores some heights as plain inches (e.g. "77"); render as 6'5".
+  if (/^\d{1,2}$/.test(h)) {
+    const inches = parseInt(h, 10);
+    if (inches > 0) return `${Math.floor(inches / 12)}'${inches % 12}"`;
+  }
+  return h;
 }
 
 export function getTeamRecord(s: RosterSettings): string {

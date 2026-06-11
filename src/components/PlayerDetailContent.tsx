@@ -14,6 +14,7 @@ import {
   showByeForSeason,
   valueSources,
   blendedValue,
+  resolveInjury,
 } from '../playerFunctions';
 
 const TrendingChip = () => (
@@ -38,19 +39,6 @@ const DetailGroup = ({
 }) => (
   <div className={detailGroupShell(compact)}>
     <div className='mb-1.5 text-[10px] uppercase tracking-wide text-gray-400'>{title}</div>
-    <div className='flex flex-col gap-1 text-sm'>{children}</div>
-  </div>
-);
-
-/** Same card styling as DetailGroup, without a section header (compact roster meta). */
-const DetailPanel = ({
-  children,
-  compact = false,
-}: {
-  children: React.ReactNode;
-  compact?: boolean;
-}) => (
-  <div className={detailGroupShell(compact)}>
     <div className='flex flex-col gap-1 text-sm'>{children}</div>
   </div>
 );
@@ -90,6 +78,16 @@ const DetailItem = ({
     </div>
   );
 };
+
+/** Label-over-value cell for the static profile grid (roster expand). */
+const StaticField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+  <div className='flex min-w-0 flex-col gap-0.5'>
+    <span className='lbl text-[10px] text-ink-mid'>{label}</span>
+    <span className='truncate text-sm text-ink-hi' title={typeof value === 'string' ? value : undefined}>
+      {value == null || value === '' ? '—' : value}
+    </span>
+  </div>
+);
 
 function resolveOwnership(
   player: Player,
@@ -156,44 +154,31 @@ export const PlayerDetailContent = memo(({
     !!player.injury_status ||
     !!player.injury_notes ||
     !!player.practice_participation ||
-    (!!ktcInjury && compact);
+    !!ktcInjury;
 
-  const compactInjured =
-    compact &&
-    ((player.status && player.status !== 'Active') ||
-      !!player.injury_status ||
-      !!player.injury_notes ||
-      !!player.practice_participation ||
-      !!ktcInjury);
-
-  const compactInjuryLine = (() => {
-    if (!compactInjured) return null;
-    const parts: string[] = [];
-    if (player.injury_status) {
-      parts.push(
-        player.injury_body_part
-          ? `${player.injury_status} — ${player.injury_body_part}`
-          : player.injury_status
-      );
-    } else if (player.status && player.status !== 'Active') {
-      parts.push(player.status);
-    }
-    if (ktcInjury) parts.push(ktcInjury);
-    if (player.practice_participation) {
-      parts.push(
-        player.practice_description
-          ? `${player.practice_participation} — ${player.practice_description}`
-          : player.practice_participation
-      );
-    }
-    if (player.injury_notes) parts.push(player.injury_notes);
-    return parts.length > 0 ? parts.join(' · ') : null;
-  })();
-
-  const compactDraftValue =
+  // Static-profile derivations (roster expand) — bio/draft only, no dynamic data.
+  const injury = resolveInjury(player);
+  const expValue =
+    player.years_exp != null
+      ? player.years_exp === 0
+        ? 'Rookie'
+        : `${player.years_exp} yr${player.years_exp !== 1 ? 's' : ''}`
+      : '—';
+  const draftedValue =
     ktc?.draftYear != null && pickLabel
       ? `${ktc.draftYear} · ${pickLabel}`
-      : ktc?.draftYear ?? pickLabel ?? '—';
+      : ktc?.draftYear != null
+        ? String(ktc.draftYear)
+        : pickLabel ?? '—';
+  const depthLabel =
+    player.depth_chart_order != null
+      ? `${player.position ?? player.depth_chart_position ?? ''}${player.depth_chart_order}`
+      : player.depth_chart_position ?? '—';
+  const birthplace = [player.birth_city, player.birth_state].filter(Boolean).join(', ') || '—';
+  const positionsValue =
+    player.fantasy_positions && player.fantasy_positions.length > 0
+      ? player.fantasy_positions.join(', ')
+      : player.position ?? '—';
 
   return (
     <div className={showHeader ? 'space-y-3' : undefined}>
@@ -207,44 +192,40 @@ export const PlayerDetailContent = memo(({
       ) : null}
 
       {compact ? (
-        <div className='grid grid-cols-1 gap-1.5 sm:grid-cols-2 sm:gap-2'>
-          <DetailPanel compact>
-            <DetailItem
-              Icon={UserIcon}
-              label='#'
-              value={`${player.number ?? 'N/A'} · ${player.team || 'Free Agent'}`}
+        <div className='flex flex-col gap-2'>
+          <div className='grid grid-cols-2 gap-x-3 gap-y-2 rounded border border-line bg-white/[0.02] px-2.5 py-2 sm:grid-cols-3 md:grid-cols-4'>
+            <StaticField label='Age' value={player.age ?? '—'} />
+            <StaticField label='Exp' value={expValue} />
+            <StaticField label='Height' value={formatHeight(player)} />
+            <StaticField label='Weight' value={player.weight ? `${player.weight} lbs` : '—'} />
+            <StaticField label='College' value={player.college ?? '—'} />
+            <StaticField label='Drafted' value={draftedValue} />
+            <StaticField label='Depth' value={depthLabel} />
+            <StaticField label='Bye' value={showBye ? (ktc?.byeWeek ?? '—') : '—'} />
+            <StaticField
+              label='Birth date'
+              value={player.birth_date ? formatBirthDate(player.birth_date) : '—'}
             />
-            <DetailItem
-              Icon={CalendarIcon}
-              label='Exp'
-              value={`${player.years_exp ?? 0} yr${(player.years_exp ?? 0) !== 1 ? 's' : ''}`}
-            />
-            <DetailItem Icon={CakeIcon} label='Age' value={player.age ?? 'N/A'} />
-            <DetailItem
-              Icon={CakeIcon}
-              label='Ht/Wt'
-              value={`${formatHeight(player)} · ${player.weight ?? 'N/A'} lbs`}
-            />
-          </DetailPanel>
-          <DetailPanel compact>
-            <DetailItem
-              Icon={AcademicCapIcon}
-              label='College'
-              value={player.college ?? 'N/A'}
-            />
-            <DetailItem label='Draft' value={compactDraftValue} />
-            <DetailItem
-              label='Bye wk'
-              value={showBye ? (ktc?.byeWeek ?? '—') : '—'}
-            />
-            {compactInjured && compactInjuryLine && (
-              <DetailItem
-                label='Injury'
-                value={compactInjuryLine}
-                tone={player.injury_status ? 'danger' : 'warn'}
-              />
-            )}
-          </DetailPanel>
+            <StaticField label='Birthplace' value={birthplace} />
+            <StaticField label='Positions' value={positionsValue} />
+            <StaticField label='Status' value={player.status || 'Active'} />
+            <StaticField label='Rookie yr' value={player.rookie_year ?? '—'} />
+            <StaticField label='High school' value={player.high_school ?? '—'} />
+            <StaticField label='Jersey' value={player.number != null ? `#${player.number}` : '—'} />
+            <StaticField label='Team' value={player.team || 'FA'} />
+          </div>
+          {injury && (
+            <div
+              className={`flex items-baseline gap-2 rounded border px-2.5 py-1.5 text-sm ${
+                injury.severity === 'danger'
+                  ? 'border-red-500/30 bg-red-500/10 text-red-300'
+                  : 'border-amber-500/30 bg-amber-500/10 text-amber-200'
+              }`}
+            >
+              <span className='lbl shrink-0 text-[10px] text-ink-mid'>Injury · {injury.source}</span>
+              <span className='min-w-0'>{injury.text}</span>
+            </div>
+          )}
         </div>
       ) : (
       <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3'>
@@ -278,11 +259,20 @@ export const PlayerDetailContent = memo(({
             label='College'
             value={player.college ?? 'N/A'}
           />
-          {player.depth_chart_position != null && (
-            <DetailItem label='Depth' value={player.depth_chart_position} />
+          {(player.depth_chart_order != null || player.depth_chart_position != null) && (
+            <DetailItem label='Depth' value={depthLabel} />
           )}
           {player.fantasy_positions && player.fantasy_positions.length > 0 && (
             <DetailItem label='Positions' value={player.fantasy_positions.join(', ')} />
+          )}
+          {(player.birth_city || player.birth_state) && (
+            <DetailItem label='Birthplace' value={birthplace} />
+          )}
+          {player.rookie_year != null && (
+            <DetailItem label='Rookie yr' value={player.rookie_year} />
+          )}
+          {player.high_school && (
+            <DetailItem Icon={AcademicCapIcon} label='High school' value={player.high_school} />
           )}
         </DetailGroup>
 

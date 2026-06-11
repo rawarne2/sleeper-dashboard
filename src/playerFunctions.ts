@@ -19,7 +19,14 @@ interface BackendPlayer {
     college?: string;
     years_exp?: number;
     number?: number;
-    depth_chart_position?: number;
+    depth_chart_position?: string | null;
+    depth_chart_order?: number;
+    fantasy_positions?: string[];
+    rookie_year?: number;
+    birth_city?: string;
+    birth_state?: string;
+    high_school?: string;
+    news_updated?: number;
     status?: string;
     injury_status?: string | null;
     injury_body_part?: string | null;
@@ -27,6 +34,7 @@ interface BackendPlayer {
     injury_start_date?: string | null;
     practice_participation?: string | null;
     practice_description?: string | null;
+    weekly_injury_status?: string | null;
     ktc?: KTCData & { age?: number };
     stats?: PlayerStats;
     research_latest?: ResearchLatest | null;
@@ -50,7 +58,17 @@ export function mapBackendPlayerRow(player: BackendPlayer): Player | null {
         weight: player.weight,
         years_exp: player.years_exp,
         college: player.college,
-        fantasy_positions: [player.position || ''],
+        fantasy_positions:
+            player.fantasy_positions && player.fantasy_positions.length > 0
+                ? player.fantasy_positions
+                : player.position
+                  ? [player.position]
+                  : [],
+        rookie_year: player.rookie_year,
+        birth_city: player.birth_city,
+        birth_state: player.birth_state,
+        high_school: player.high_school,
+        news_updated: player.news_updated,
         status: player.status || 'Active',
         injury_status: player.injury_status ?? null,
         injury_body_part: player.injury_body_part ?? null,
@@ -58,8 +76,10 @@ export function mapBackendPlayerRow(player: BackendPlayer): Player | null {
         injury_start_date: player.injury_start_date ?? null,
         practice_participation: player.practice_participation ?? null,
         practice_description: player.practice_description ?? null,
+        weekly_injury_status: player.weekly_injury_status ?? null,
         number: player.number,
-        depth_chart_position: player.depth_chart_position,
+        depth_chart_position: player.depth_chart_position ?? null,
+        depth_chart_order: player.depth_chart_order,
         ktc: player.ktc,
         values: (player as { values?: ValuesBlock }).values ?? null,
         stats: player.stats,
@@ -186,6 +206,56 @@ export function formatKtcInjury(injury: unknown): string | null {
     const obj = parseKtcInjuryObject(injury);
     if (!obj) return injury == null ? null : String(injury);
     return formatKtcInjuryFromObject(obj);
+}
+
+export interface InjuryDisplay {
+    /** Stored source that supplied the line (primary → tertiary precedence). */
+    source: 'sleeper' | 'ktc' | 'weekly';
+    text: string;
+    severity: 'danger' | 'warn';
+}
+
+/** Sleeper-native injury line from status/body part/notes/practice. */
+function sleeperInjuryLine(player: Player): string | null {
+    const parts: string[] = [];
+    if (player.injury_status) {
+        parts.push(
+            player.injury_body_part
+                ? `${player.injury_status} — ${player.injury_body_part}`
+                : player.injury_status
+        );
+    }
+    if (player.practice_participation) {
+        parts.push(
+            player.practice_description
+                ? `${player.practice_participation} — ${player.practice_description}`
+                : player.practice_participation
+        );
+    }
+    if (player.injury_notes) parts.push(player.injury_notes);
+    return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
+ * Resolves one injury line by source precedence — primary Sleeper, then KTC's
+ * injury blob, then weekly injury status. Display only; all sources stay stored.
+ * Returns null when no source reports an active injury.
+ */
+export function resolveInjury(player: Player): InjuryDisplay | null {
+    const sleeper = sleeperInjuryLine(player);
+    if (sleeper) {
+        return {
+            source: 'sleeper',
+            text: sleeper,
+            severity: player.injury_status ? 'danger' : 'warn',
+        };
+    }
+    const ktc = formatKtcInjury(player.ktc?.injury);
+    if (ktc) return { source: 'ktc', text: ktc, severity: 'warn' };
+    if (player.weekly_injury_status) {
+        return { source: 'weekly', text: player.weekly_injury_status, severity: 'warn' };
+    }
+    return null;
 }
 
 /** Only show bye week when viewing the current bundle season. */

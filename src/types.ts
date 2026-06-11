@@ -268,9 +268,20 @@ export interface Player {
     college?: string;
     years_exp?: number;
     number?: number;
-    depth_chart_position?: number;
+    /** Sleeper depth-chart slot label, e.g. `LWR`, `QB`. */
+    depth_chart_position?: string | null;
+    /** Sleeper depth-chart rank (1 = starter). */
+    depth_chart_order?: number;
+    rookie_year?: number;
+    birth_city?: string;
+    birth_state?: string;
+    high_school?: string;
+    /** Epoch-ms of the last Sleeper news update for this player. */
+    news_updated?: number;
     status?: string;
     injury_status?: string | null;
+    /** Tertiary injury source from weekly data; not yet carried by the roster bundle. */
+    weekly_injury_status?: string | null;
     /** Optional Sleeper injury detail surfaced on the dashboard expand row. */
     injury_body_part?: string | null;
     injury_notes?: string | null;
