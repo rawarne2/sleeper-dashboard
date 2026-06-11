@@ -7,15 +7,17 @@ import { TeamPanel } from './components/TeamPanel';
 import { LeaguePickerCard } from './components/LeaguePickerCard';
 import { LegendModal } from './components/LegendModal';
 import { TradeAnalyzerPage } from './pages/TradeAnalyzerPage';
+import AllPlayersPage from './pages/AllPlayersPage';
 
 /** Horizontal padding shared by header and tab bar. */
 const dashboardShell = 'w-full px-3 sm:px-5 md:px-6';
 
-type DashboardTab = 'standings' | 'trade-analyzer';
+type DashboardTab = 'standings' | 'all-players' | 'trade-analyzer';
 
 function normalizeDashboardHash(hash: string): DashboardTab {
   const cleaned = (hash || '').trim().replace(/^#/, '').toLowerCase();
   if (cleaned === 'trade-analyzer') return 'trade-analyzer';
+  if (cleaned === 'all-players') return 'all-players';
   return 'standings';
 }
 
@@ -102,7 +104,7 @@ const Dashboard: React.FC = () => {
       <div className={`${dashboardShell} py-2`}>
         <div className='flex w-full items-center justify-center'>
           <div
-            className='flex w-full max-w-md gap-1.5 rounded-xl border border-white/10 bg-black/20 p-1.5'
+            className='flex w-full max-w-2xl gap-1.5 rounded-xl border border-white/10 bg-black/20 p-1.5'
             role='tablist'
             aria-label='Dashboard views'
           >
@@ -116,6 +118,17 @@ const Dashboard: React.FC = () => {
               onClick={() => setActiveTab('standings')}
             >
               League Standings
+            </button>
+            <button
+              type='button'
+              role='tab'
+              aria-selected={activeTab === 'all-players'}
+              className={`${baseBtn} flex-1 ${
+                activeTab === 'all-players' ? tabActive : tabInactive
+              }`}
+              onClick={() => setActiveTab('all-players')}
+            >
+              All Players
             </button>
             <button
               type='button'
@@ -335,7 +348,12 @@ const Dashboard: React.FC = () => {
       {tabBar}
 
       <div className='flex-1'>
-        {loading ? (
+        {/* All Players is standalone — it must not wait on the league bundle. */}
+        {activeTab === 'all-players' ? (
+          <div className='bg-background-paper py-4 sm:py-5'>
+            <AllPlayersPage />
+          </div>
+        ) : loading ? (
           <div className='flex flex-col justify-center items-center h-[50vh] gap-3'>
             <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-main' />
             <div className='text-xl'>Loading league data…</div>

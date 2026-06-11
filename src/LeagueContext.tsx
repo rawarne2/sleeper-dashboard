@@ -19,17 +19,26 @@ import {
   PlayerDBSchema,
   DashboardLeagueBundle,
   TradeAnalyzerPick,
+  KtcConfig,
 } from './types';
 import { ktcDisplayValues, playersFromDashboardBundle } from './playerFunctions';
 import { API_CONFIG, buildApiUrl } from './apiConfig';
 import { LeagueContext } from './leagueContextValue';
 import {
   dashboardBundleCacheKey,
+  getStoredKtcConfig,
+  putStoredKtcConfig,
   readCachedDashboardBundle,
   resolveDashboardSeasonParam,
   tradePicksByRosterFromBundle,
   writeCachedDashboardBundle,
 } from './dashboardBundleCache';
+import {
+  FALLBACK_KTC_CONFIG,
+  ktcConfigEquals,
+  ktcConfigParams,
+  resolveLeagueKtcConfig,
+} from './utils/leagueConfig';
 
 const DB_NAME = 'sleeper-players-db';
 const DB_VERSION = 4;
@@ -90,6 +99,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   const [selectedLeagueId, setSelectedLeagueIdState] = useState('');
   const selectedLeagueIdRef = useRef(selectedLeagueId);
   selectedLeagueIdRef.current = selectedLeagueId;
+  // Auto-detected KTC identity for the loaded league (replaces the old hardcode).
+  const ktcConfigRef = useRef<KtcConfig>(FALLBACK_KTC_CONFIG);
 
   const initDB = useCallback(async () => {
     return openDB<PlayerDBSchema>(DB_NAME, DB_VERSION, {
@@ -126,8 +137,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         const db = await initDB();
         const row = await db.get('app_prefs', 'league_id');
         if (!cancelled) {
-          const id =
-            row && row.key === 'league_id' ? (row.leagueId ?? '').trim() : '';
+          const id = row && 'leagueId' in row ? (row.leagueId ?? '').trim() : '';
           setSelectedLeagueIdState(id);
           setLeagueIdReady(true);
         }
@@ -188,9 +198,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       API_CONFIG.ENDPOINTS.DASHBOARD_LEAGUE(selectedLeagueId),
       {
         season: seasonParam,
-        league_format: 'superflex',
-        is_redraft: 'false',
-        tep_level: 'tep',
+        ...ktcConfigParams(ktcConfigRef.current),
       }
     );
 
@@ -260,11 +268,10 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     setRefreshing(true);
     setError(null);
     try {
-      const refreshUrl = buildApiUrl(API_CONFIG.ENDPOINTS.KTC_REFRESH, {
-        league_format: 'superflex',
-        is_redraft: 'false',
-        tep_level: 'tep',
-      });
+      const refreshUrl = buildApiUrl(
+        API_CONFIG.ENDPOINTS.KTC_REFRESH,
+        ktcConfigParams(ktcConfigRef.current)
+      );
       const scrapeRes = await fetch(refreshUrl, { method: 'POST' });
       if (!scrapeRes.ok) {
         const body = await scrapeRes.json().catch(() => ({}));
@@ -310,32 +317,46 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
 
   const loadFullData = useCallback(async () => {
     const forLeagueId = selectedLeagueId;
-    const cacheKey = dashboardBundleCacheKey(forLeagueId);
 
     setTradePicksByRoster(new Map());
     setLoading(true);
     setError(null);
     let paintedFromCache = false;
 
-    const dbPromise = initDB();
-    const bundlePromise = fetchBundle();
-
     try {
-      const db = await dbPromise;
+      const db = await initDB();
       if (selectedLeagueIdRef.current !== forLeagueId) return;
+
+      // Resolve the league's KTC identity: persisted config, else fallback.
+      let config = (await getStoredKtcConfig(db, forLeagueId)) ?? FALLBACK_KTC_CONFIG;
+      ktcConfigRef.current = config;
+      let cacheKey = dashboardBundleCacheKey(forLeagueId, config);
 
       const cached = await readCachedDashboardBundle(db, cacheKey);
       if (selectedLeagueIdRef.current !== forLeagueId) return;
 
       if (cached) {
-        const cachedPlayers = playersFromDashboardBundle(cached.players);
-        applyDashboardBundle(cached, cachedPlayers);
+        applyDashboardBundle(cached, playersFromDashboardBundle(cached.players));
         paintedFromCache = true;
         setLoading(false);
       }
 
-      const { data, playersMap } = await bundlePromise;
+      let { data, playersMap } = await fetchBundle();
       if (selectedLeagueIdRef.current !== forLeagueId) return;
+
+      // The bundle reveals real league settings; refetch once if we fetched with
+      // the wrong identity (e.g. a 1QB or non-TEP league on a cold load).
+      const trueConfig = resolveLeagueKtcConfig(data.league, data.rosters);
+      if (!ktcConfigEquals(trueConfig, config)) {
+        config = trueConfig;
+        ktcConfigRef.current = trueConfig;
+        cacheKey = dashboardBundleCacheKey(forLeagueId, trueConfig);
+        const corrected = await fetchBundle();
+        if (selectedLeagueIdRef.current !== forLeagueId) return;
+        data = corrected.data;
+        playersMap = corrected.playersMap;
+      }
+      void putStoredKtcConfig(db, forLeagueId, trueConfig);
 
       applyDashboardBundle(data, playersMap);
       setError(null);

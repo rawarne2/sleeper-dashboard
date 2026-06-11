@@ -16,6 +16,7 @@ export const API_CONFIG = {
 
   ENDPOINTS: {
     DASHBOARD_LEAGUE: (leagueId: string) => `/dashboard/league/${leagueId}`,
+    PLAYERS_ALL: '/players/all',
     KTC_REFRESH: '/ktc/refresh',
     KTC_REFRESH_STATUS: (jobId: string) => `/ktc/refresh/status/${jobId}`,
     TRADE_ANALYZER_PROVIDERS: '/trade-analyzer/providers',

@@ -1,0 +1,61 @@
+// src/__tests__/leagueConfig.test.ts
+import { describe, it, expect } from 'vitest';
+import { resolveLeagueKtcConfig, FALLBACK_KTC_CONFIG } from '../utils/leagueConfig';
+import type { League } from '../types';
+
+const league = (over: Partial<League>): League => ({
+  league_id: 'x',
+  name: 'L',
+  season: '2025',
+  total_rosters: 12,
+  status: 'complete',
+  ...over,
+});
+
+describe('resolveLeagueKtcConfig', () => {
+  it('falls back to SF / dynasty / tep when league is null', () => {
+    expect(resolveLeagueKtcConfig(null)).toEqual(FALLBACK_KTC_CONFIG);
+  });
+
+  it('detects superflex dynasty TEP (SUPER_FLEX, type 2, bonus_rec_te 0.5)', () => {
+    const cfg = resolveLeagueKtcConfig(
+      league({
+        roster_positions: ['QB', 'RB', 'WR', 'TE', 'FLEX', 'SUPER_FLEX', 'BN'],
+        league_settings: { type: 2, taxi_slots: 4 },
+        scoring_settings: { bonus_rec_te: 0.5, rec: 0.5 },
+      })
+    );
+    expect(cfg).toEqual({ league_format: 'superflex', is_redraft: false, tep_level: 'tep' });
+  });
+
+  it('detects 1QB redraft non-TEP', () => {
+    const cfg = resolveLeagueKtcConfig(
+      league({
+        roster_positions: ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'BN'],
+        league_settings: { type: 0, taxi_slots: 0 },
+        scoring_settings: { bonus_rec_te: 0, rec: 1 },
+      })
+    );
+    expect(cfg).toEqual({ league_format: '1qb', is_redraft: true, tep_level: '' });
+  });
+
+  it('treats 2+ QB slots as superflex even without a SUPER_FLEX slot', () => {
+    expect(
+      resolveLeagueKtcConfig(league({ roster_positions: ['QB', 'QB', 'RB', 'WR'] })).league_format
+    ).toBe('superflex');
+  });
+
+  it('maps TE-premium tiers from bonus_rec_te', () => {
+    const tep = (bte: number) =>
+      resolveLeagueKtcConfig(league({ scoring_settings: { bonus_rec_te: bte } })).tep_level;
+    expect(tep(1.0)).toBe('tepp');
+    expect(tep(1.5)).toBe('teppp');
+    expect(tep(0)).toBe('');
+  });
+
+  it('keeps a taxi-squad keeper league as dynasty (not redraft)', () => {
+    expect(
+      resolveLeagueKtcConfig(league({ league_settings: { type: 1, taxi_slots: 2 } })).is_redraft
+    ).toBe(false);
+  });
+});

@@ -348,6 +348,12 @@ export interface League {
     season: string;
     total_rosters: number;
     status: string;
+    /** Sleeper roster slots, e.g. ["QB","RB","WR","SUPER_FLEX",...]; used to auto-detect format. */
+    roster_positions?: string[];
+    /** Sleeper scoring settings (e.g. `bonus_rec_te` for TE premium detection). */
+    scoring_settings?: Record<string, number>;
+    /** Sleeper league settings (e.g. `type`: 0 redraft / 1 keeper / 2 dynasty, `taxi_slots`). */
+    league_settings?: Record<string, number>;
 }
 
 export interface LeagueDataResponse {
@@ -491,8 +497,22 @@ export interface AppPrefLeagueId {
     leagueId: string;
 }
 
+/** KTC query identity (format / dynasty-vs-redraft / TE-premium) for a league. */
+export interface KtcConfig {
+    league_format: 'superflex' | '1qb';
+    is_redraft: boolean;
+    tep_level: '' | 'tep' | 'tepp' | 'teppp';
+}
+
+/** Persisted per-league resolved KtcConfig (`key` = `ktc_config:<leagueId>`). */
+export interface AppPrefKtcConfig {
+    key: string;
+    config: KtcConfig;
+}
+
 export type AppPrefRow =
     | AppPrefLeagueId
+    | AppPrefKtcConfig
     | TradeAnalyzerPrefsRow
     | TradeAnalyzerLastResultRow
     | TradeAnalyzerHistoryRow;

@@ -38,6 +38,17 @@ export function ValueCell({ values }: { values?: ValuesBlock | null }) {
   );
 }
 
+/** 30-day trend cell: colored arrow + magnitude (shared by the All Players grid). */
+export function TrendCell({ trend30 }: { trend30?: number | null }) {
+  const t = trendInfo(trend30);
+  if (!t) return <span className='num text-sm leading-none text-ink-dim'>—</span>;
+  return (
+    <span className={`num text-sm font-medium leading-none ${t.textClass}`} title={t.label}>
+      {t.arrow} {t.display}
+    </span>
+  );
+}
+
 /** Generic centered numeric cell content with a tabular figure + em-dash gap. */
 export function NumCell({
   children,

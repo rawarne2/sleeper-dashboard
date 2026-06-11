@@ -2,11 +2,13 @@ import { EXAMPLE_LEAGUES } from './apiConfig';
 import type {
   DashboardLeagueBundle,
   DashboardPickRow,
+  KtcConfig,
   PlayerDBSchema,
   TradeAnalyzerPick,
 } from './types';
 import type { IDBPDatabase } from 'idb';
 import { playersFromDashboardBundle } from './playerFunctions';
+import { FALLBACK_KTC_CONFIG } from './utils/leagueConfig';
 
 /** Matches `fetchBundle` query identity (league_format, is_redraft, tep_level). */
 export function resolveDashboardSeasonParam(leagueId: string): string {
@@ -82,9 +84,39 @@ export function tradePicksByRosterFromBundle(
   return m;
 }
 
-export function dashboardBundleCacheKey(leagueId: string): string {
+export function dashboardBundleCacheKey(
+  leagueId: string,
+  config: KtcConfig = FALLBACK_KTC_CONFIG
+): string {
   const season = resolveDashboardSeasonParam(leagueId);
-  return `${leagueId}|${season}|superflex|false|tep`;
+  return `${leagueId}|${season}|${config.league_format}|${config.is_redraft}|${config.tep_level}`;
+}
+
+/** Read the persisted resolved KtcConfig for a league (breaks the cache-key cycle). */
+export async function getStoredKtcConfig(
+  db: IDBPDatabase<PlayerDBSchema>,
+  leagueId: string
+): Promise<KtcConfig | null> {
+  try {
+    const row = await db.get('app_prefs', `ktc_config:${leagueId}`);
+    if (row && 'config' in row && row.config) return row.config;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the resolved KtcConfig for a league so later loads key the cache correctly. */
+export async function putStoredKtcConfig(
+  db: IDBPDatabase<PlayerDBSchema>,
+  leagueId: string,
+  config: KtcConfig
+): Promise<void> {
+  try {
+    await db.put('app_prefs', { key: `ktc_config:${leagueId}`, config });
+  } catch (e) {
+    console.warn('Failed to persist league KTC config', e);
+  }
 }
 
 export function isDashboardBundleDisplayable(
