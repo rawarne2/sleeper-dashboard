@@ -28,7 +28,7 @@ function setDashboardHash(tab: DashboardTab) {
 }
 
 const metaPillBase =
-  'lbl inline-flex max-w-full items-baseline gap-1 rounded-full border border-line-soft px-2 py-0.5 text-[9px] leading-tight sm:px-2.5 sm:py-1 sm:text-[10px]';
+  'lbl inline-flex max-w-full items-baseline gap-1 rounded-full border border-line-soft px-2 py-0.5 text-[11px] leading-tight sm:px-2.5 sm:py-1';
 
 function HeaderPill({
   label,
