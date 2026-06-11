@@ -55,7 +55,9 @@ const PlayerDetailRow = memo(({
 }) => (
   <tr>
     <td colSpan={TOTAL_COLS} className='p-0 align-top'>
-      <div className='player-detail-row sticky left-0'>
+      {/* Cap width + sticky-left so the static profile stays a tidy, readable
+          card pinned to the left instead of stretching across the wide table. */}
+      <div className='player-detail-row sticky left-0 w-[min(100vw,60rem)] max-w-full'>
         <PlayerDetailContent
           player={player}
           bundleSeason={bundleSeason}
