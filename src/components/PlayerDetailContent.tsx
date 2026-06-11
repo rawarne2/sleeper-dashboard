@@ -330,7 +330,7 @@ export const PlayerDetailContent = memo(({
 
         {player.values && (
           <DetailGroup title='Sources'>
-            <DetailItem label='Blended' value={blendedValue(player)?.toLocaleString() ?? '—'} />
+            <DetailItem label='Consensus' value={blendedValue(player)?.toLocaleString() ?? '—'} />
             {valueSources(player).map((s) => (
               <DetailItem key={s.key} label={s.label} value={s.value?.toLocaleString() ?? '—'} />
             ))}

@@ -227,10 +227,9 @@ a:hover {
 }
 
 
-h1 {
-  font-size: 2.25em;
-  line-height: 1.15;
-}
+/* h1 global size intentionally removed — the only <h1> in the app
+ * (Dashboard header title) uses Tailwind utility classes for its font-size;
+ * the old 2.25em rule was Vite-starter cruft that outranked layered utilities. */
 
 button {
   border-radius: 8px;

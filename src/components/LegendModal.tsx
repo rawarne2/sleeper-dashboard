@@ -20,7 +20,7 @@ const OWNERSHIP_TIERS = [
 ];
 
 const VALUE_SOURCES = [
-  { label: 'Blended', text: 'Scale-normalized consensus of KTC + FantasyCalc (primary value).' },
+  { label: 'Consensus', text: 'Scale-normalized consensus of KTC + FantasyCalc (primary value).' },
   { label: 'KTC', text: 'KeepTradeCut — crowd-ELO dynasty trade value. TEP adjustment is KTC-only.' },
   { label: 'FC', text: 'FantasyCalc — value derived from real league trades; includes liquidity.' },
   { label: 'Sleeper proj', text: 'Sleeper weekly projected fantasy points (forward-looking).' },

@@ -28,12 +28,12 @@ function setDashboardHash(tab: DashboardTab) {
 }
 
 const metaPillBase =
-  'inline-flex max-w-full items-baseline gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-tight sm:px-2.5 sm:py-1 sm:text-xs';
+  'lbl inline-flex max-w-full items-baseline gap-1 rounded-full border border-line-soft px-2 py-0.5 text-[9px] leading-tight sm:px-2.5 sm:py-1 sm:text-[10px]';
 
 function HeaderPill({
   label,
   value,
-  className = 'bg-white/5',
+  className = 'bg-surface-card',
 }: {
   label: string;
   value: string;
@@ -41,8 +41,8 @@ function HeaderPill({
 }) {
   return (
     <span className={`${metaPillBase} ${className}`} title={`${label}: ${value}`}>
-      <span className='shrink-0 text-gray-400'>{label}:</span>
-      <span className='truncate text-gray-200'>{value}</span>
+      <span className='lbl shrink-0 text-ink-dim'>{label}:</span>
+      <span className='truncate text-ink-mid'>{value}</span>
     </span>
   );
 }
@@ -249,10 +249,11 @@ const Dashboard: React.FC = () => {
       {league?.season && <HeaderPill label='League season' value={league.season} />}
       {!loading && researchWeek != null && (
         <span
-          className={`${metaPillBase} bg-white/5 text-gray-200`}
+          className={`${metaPillBase} bg-surface-card text-ink-mid`}
           title={`Sleeper research week ${researchWeek}`}
         >
-          Sleeper week {researchWeek}
+          <span className='lbl text-ink-dim'>Sleeper week</span>{' '}
+          <span>{researchWeek}</span>
         </span>
       )}
       {league?.total_rosters != null && (
@@ -260,7 +261,7 @@ const Dashboard: React.FC = () => {
       )}
       {!loading && (
         <>
-          <HeaderPill label='Rankings' value='Blended · KTC + FantasyCalc' />
+          <HeaderPill label='Rankings' value='Consensus · KTC + FantasyCalc' />
           {ktcUpdatedLabel && (
             <HeaderPill label='KTC last updated' value={ktcUpdatedLabel} />
           )}
@@ -298,47 +299,51 @@ const Dashboard: React.FC = () => {
         </div>
       ) : null}
 
-      <header className='bg-[#0d1e2e]'>
-        <div className={`${dashboardShell} flex flex-col gap-1.5 py-2 sm:gap-2 sm:py-2.5`}>
-          <h1 className='text-center text-xs font-semibold tracking-tight text-gray-300 sm:text-sm'>
+      <header className='border-b border-line bg-surface-header'>
+        <div className={`${dashboardShell} flex flex-col gap-1 py-2 sm:gap-1.5 sm:py-2.5`}>
+          {/* App title */}
+          <h1 className='hd text-center text-xs font-semibold tracking-wide text-ink-dim sm:text-sm'>
             Sleeper Dynasty Dashboard
           </h1>
 
-          <div className='flex flex-col items-center gap-2 md:flex-row md:items-center md:justify-between md:gap-3'>
-            <div className='min-w-0 text-center text-xs md:text-left md:text-sm'>
+          {/* League info + controls row */}
+          <div className='flex flex-col items-center gap-1.5 md:flex-row md:items-center md:justify-between md:gap-3'>
+            {/* League name + ID */}
+            <div className='min-w-0 text-center md:text-left'>
               {league?.name ? (
-                <p className='truncate' title={league.name}>
-                  <span className='text-gray-400'>League:</span>{' '}
-                  <span className='font-semibold text-gray-100'>{league.name}</span>
+                <p className='truncate text-xs leading-tight md:text-sm' title={league.name}>
+                  <span className='lbl text-ink-dim'>League:</span>{' '}
+                  <span className='font-semibold text-ink-hi'>{league.name}</span>
                 </p>
               ) : (
-                <p>
-                  <span className='text-gray-400'>League:</span>{' '}
-                  <span className='text-gray-400'>—</span>
+                <p className='text-xs md:text-sm'>
+                  <span className='lbl text-ink-dim'>League:</span>{' '}
+                  <span className='text-ink-dim'>—</span>
                 </p>
               )}
-              <p className='mt-0.5 font-mono text-[10px] tabular-nums md:text-xs'>
-                <span className='font-sans text-gray-400'>ID:</span>{' '}
-                <span className='text-gray-400'>{selectedLeagueId}</span>
+              <p className='num mt-0.5 text-[10px] text-ink-dim md:text-xs'>
+                <span className='lbl'>ID:</span>{' '}
+                <span>{selectedLeagueId}</span>
               </p>
             </div>
 
+            {/* Legend + Change league */}
             <div className='flex shrink-0 items-center justify-center gap-1 md:justify-end md:gap-1.5'>
               <button
                 type='button'
-                className='inline-flex items-center justify-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white sm:px-2.5 sm:py-1.5 sm:text-sm'
+                className='inline-flex items-center justify-center gap-1 rounded-md border border-line-soft px-2 py-1 text-xs font-medium text-ink-mid transition-colors hover:border-line hover:bg-surface-card hover:text-ink-hi sm:px-2.5 sm:py-1.5'
                 onClick={() => setLegendOpen(true)}
                 aria-label='Open legend'
               >
-                <InformationCircleIcon className='h-4 w-4 shrink-0' />
-                Legend
+                <InformationCircleIcon className='h-3.5 w-3.5 shrink-0' />
+                <span className='lbl text-[9px] sm:text-[10px]'>Legend</span>
               </button>
               <button
                 type='button'
-                className='inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-medium text-gray-400 transition-colors hover:bg-white/5 hover:text-white sm:px-2.5 sm:py-1.5 sm:text-sm'
+                className='inline-flex items-center justify-center rounded-md border border-line-soft px-2 py-1 text-xs font-medium text-ink-mid transition-colors hover:border-line hover:bg-surface-card hover:text-ink-hi sm:px-2.5 sm:py-1.5'
                 onClick={() => setLeaguePickerOpen(true)}
               >
-                Change league
+                <span className='lbl text-[9px] sm:text-[10px]'>Change league</span>
               </button>
             </div>
           </div>
