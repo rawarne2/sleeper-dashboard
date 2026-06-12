@@ -9,11 +9,7 @@ import type { KtcConfig, Player } from '../types';
 import { API_CONFIG, buildApiUrl } from '../apiConfig';
 import { useLeague } from '../useLeague';
 import { mapBackendPlayerRow, ktcDisplayValues } from '../playerFunctions';
-import {
-  FALLBACK_KTC_CONFIG,
-  ktcConfigParams,
-  resolveLeagueKtcConfig,
-} from '../utils/leagueConfig';
+import { ktcConfigParams } from '../utils/leagueConfig';
 import { POSITION_ORDER, positionColorVar } from '../utils/valueDisplay';
 import { type SortDirection } from '../components/playerTable/ColumnHeader';
 import { PlayerStatHeader, type StatSortKey } from '../components/playerTable/PlayerStatHeader';
@@ -55,12 +51,14 @@ const PostureToggle = ({
 );
 
 export default function AllPlayersPage() {
-  const { league, playerOwnership, bundleSeason } = useLeague();
+  const { ktcConfig, playerOwnership, bundleSeason } = useLeague();
 
-  // Default league type = the in-context league's detected config, else fallback.
-  const [config, setConfig] = useState<KtcConfig>(() =>
-    league ? resolveLeagueKtcConfig(league) : { ...FALLBACK_KTC_CONFIG }
-  );
+  // Seed from the league's resolved KTC identity; the toggles below allow local
+  // overrides. Switching leagues re-syncs to the new league's identity.
+  const [config, setConfig] = useState<KtcConfig>(ktcConfig);
+  useEffect(() => {
+    setConfig(ktcConfig);
+  }, [ktcConfig]);
 
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,8 +82,15 @@ export default function AllPlayersPage() {
       try {
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) throw new Error(`Failed to load players: ${res.status}`);
-        const body = (await res.json()) as { players?: unknown[] };
-        const list = Array.isArray(body.players) ? body.players : [];
+        const body = (await res.json()) as {
+          players?: unknown[];
+          data?: { players?: unknown[] };
+        };
+        const list = Array.isArray(body.players)
+          ? body.players
+          : Array.isArray(body.data?.players)
+            ? body.data.players
+            : [];
         const mapped = list
           .map((p) => mapBackendPlayerRow(p as Parameters<typeof mapBackendPlayerRow>[0]))
           .filter((p): p is Player => p != null);
