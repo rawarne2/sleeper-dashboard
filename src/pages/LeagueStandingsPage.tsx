@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useLeague } from '../useLeague';
 import { getLeagueStatusInfo } from '../utils/teamStats';
 import { formatKtcLastUpdatedDate, formatApiInstant } from '../utils/formatting';
+import { resolveLeagueKtcConfig } from '../utils/leagueConfig';
 import { TeamPanel } from '../components/TeamPanel';
 
 const metaPillBase =
@@ -52,6 +53,7 @@ export default function LeagueStandingsPage() {
   const researchUpdated = researchMeta?.last_updated
     ? formatApiInstant(researchMeta.last_updated)
     : null;
+  const showRedraft = resolveLeagueKtcConfig(league).is_redraft;
 
   return (
     <div className='bg-surface-raised justify-center rounded-lg'>
@@ -100,6 +102,7 @@ export default function LeagueStandingsPage() {
           bundleSeason={bundleSeason}
           leagueSeason={league?.season ?? null}
           researchWeek={researchWeek}
+          showRedraft={showRedraft}
         />
       ))}
     </div>

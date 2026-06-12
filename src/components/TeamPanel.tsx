@@ -29,6 +29,7 @@ export interface TeamPanelProps {
   bundleSeason: string | null;
   leagueSeason: string | null;
   researchWeek: number | null;
+  showRedraft: boolean;
 }
 
 export const TeamPanel = memo(({
@@ -44,6 +45,7 @@ export const TeamPanel = memo(({
   bundleSeason,
   leagueSeason,
   researchWeek,
+  showRedraft,
 }: TeamPanelProps) => {
   const { roster, user, starters, bench, reserve, taxi } = teamData;
   const s = roster.settings;
@@ -175,6 +177,7 @@ export const TeamPanel = memo(({
                   bundleSeason={bundleSeason}
                   leagueSeason={leagueSeason}
                   researchWeek={researchWeek}
+                  showRedraft={showRedraft}
                 />
               </>
             )}

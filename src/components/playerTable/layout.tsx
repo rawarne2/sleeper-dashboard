@@ -45,6 +45,21 @@ export const LeafTh = ({
   </th>
 );
 
+/**
+ * Total leaf-column count for a table variant, used for full-width `colSpan`s
+ * (section dividers + expand row in standings, the empty-state row in All Players).
+ * Shared run = Consensus, KTC, FC, (Redraft), Vol, Liq, RankPos, RankOvr, TierPos, TierOvr.
+ */
+export function statColumnCount(
+  variant: 'standings' | 'all-players',
+  showRedraft: boolean
+): number {
+  const run = showRedraft ? 10 : 9;
+  const common = 2 + 3 + 2 + run; // Own/Start + Season + Proj + run
+  if (variant === 'standings') return 1 + common + 1; // Player + common + expand
+  return 1 + 1 + 1 + common; // # + Player + Team + common
+}
+
 /** Grouped (colgroup) header spanning several leaf columns. */
 export const GroupTh = ({
   label,
