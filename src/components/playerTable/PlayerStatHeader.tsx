@@ -3,50 +3,54 @@ import { LeafTh, GroupTh, cellPad, COL_A, GROUP_EDGE } from './layout';
 
 export type StatSortKey = 'consensus' | 'redraft' | 'vol' | 'liq' | 'rank' | 'tier' | 'own';
 
+interface StatSort {
+  dirFor: (k: StatSortKey) => SortDirection;
+  onSort: (k: StatSortKey, defaultDir: 'asc' | 'desc') => void;
+}
+
 export interface PlayerStatHeaderProps {
   variant: 'standings' | 'all-players';
   showRedraft: boolean;
   /** When provided (All Players), the value-run leaf headers become sortable. */
-  sort?: {
-    dirFor: (k: StatSortKey) => SortDirection;
-    onSort: (k: StatSortKey, defaultDir: 'asc' | 'desc') => void;
-  };
+  sort?: StatSort;
+}
+
+/** Value-run leaf header — sortable when `sort` and a key are provided, else a plain tooltip header. */
+function ValTh({
+  sort,
+  label,
+  tip,
+  k,
+  defaultDir = 'desc',
+  tint = false,
+  edge = false,
+}: {
+  sort?: StatSort;
+  label: string;
+  tip: string;
+  k?: StatSortKey;
+  defaultDir?: 'asc' | 'desc';
+  tint?: boolean;
+  edge?: boolean;
+}) {
+  if (sort && k) {
+    return (
+      <th className={`${cellPad} ${tint ? COL_A : ''} ${edge ? GROUP_EDGE : ''}`} scope='col'>
+        <ColumnHeader
+          label={label}
+          tooltip={tip}
+          sortable
+          sortDirection={sort.dirFor(k)}
+          onSort={() => sort.onSort(k, defaultDir)}
+        />
+      </th>
+    );
+  }
+  return <LeafTh label={label} tip={tip} tint={tint} edge={edge} />;
 }
 
 export function PlayerStatHeader({ variant, showRedraft, sort }: PlayerStatHeaderProps) {
   const tradeSpan = showRedraft ? 6 : 5;
-
-  /** Leaf header — sortable when `sort` and a key are provided, else a plain tooltip header. */
-  const ValTh = ({
-    label,
-    tip,
-    k,
-    defaultDir = 'desc',
-    tint = false,
-    edge = false,
-  }: {
-    label: string;
-    tip: string;
-    k?: StatSortKey;
-    defaultDir?: 'asc' | 'desc';
-    tint?: boolean;
-    edge?: boolean;
-  }) => {
-    if (sort && k) {
-      return (
-        <th className={`${cellPad} ${tint ? COL_A : ''} ${edge ? GROUP_EDGE : ''}`} scope='col'>
-          <ColumnHeader
-            label={label}
-            tooltip={tip}
-            sortable
-            sortDirection={sort.dirFor(k)}
-            onSort={() => sort.onSort(k, defaultDir)}
-          />
-        </th>
-      );
-    }
-    return <LeafTh label={label} tip={tip} tint={tint} edge={edge} />;
-  };
 
   const groupRow = (
     <>
@@ -73,25 +77,34 @@ export function PlayerStatHeader({ variant, showRedraft, sort }: PlayerStatHeade
       <LeafTh label='ROS' tip='Rest-of-season projected fantasy points' edge />
       <LeafTh label='Wk' tip="Next week's projected fantasy points" tint />
       <ValTh
+        sort={sort}
         label='Consensus'
         tip='Consensus — average of KTC and FantasyCalc. Arrow shows the 30-day trend.'
         k='consensus'
         edge
       />
-      <ValTh label='KTC' tip='KeepTradeCut trade value' />
-      <ValTh label='FC' tip='FantasyCalc trade value' tint />
-      {showRedraft && <ValTh label='Redraft' tip='FantasyCalc redraft (win-now) value' k='redraft' />}
+      <ValTh sort={sort} label='KTC' tip='KeepTradeCut trade value' />
+      <ValTh sort={sort} label='FC' tip='FantasyCalc trade value' tint />
+      {showRedraft && (
+        <ValTh sort={sort} label='Redraft' tip='FantasyCalc redraft (win-now) value' k='redraft' />
+      )}
       <ValTh
+        sort={sort}
         label='Vol'
         tip='FantasyCalc value volatility — higher means a less settled price'
         k='vol'
         tint
       />
-      <ValTh label='Liq' tip='Trade liquidity — how frequently this player is traded' k='liq' />
-      <ValTh label='Pos' tip='KTC positional rank' edge />
-      <ValTh label='Ovr' tip='KTC overall rank' k='rank' defaultDir='asc' tint />
-      <ValTh label='Pos' tip='KTC positional tier' edge />
-      <ValTh label='Ovr' tip='KTC overall tier' k='tier' defaultDir='asc' tint />
+      <ValTh
+        sort={sort}
+        label='Liq'
+        tip='Trade liquidity — how frequently this player is traded'
+        k='liq'
+      />
+      <ValTh sort={sort} label='Pos' tip='KTC positional rank' edge />
+      <ValTh sort={sort} label='Ovr' tip='KTC overall rank' k='rank' defaultDir='asc' tint />
+      <ValTh sort={sort} label='Pos' tip='KTC positional tier' edge />
+      <ValTh sort={sort} label='Ovr' tip='KTC overall tier' k='tier' defaultDir='asc' tint />
     </>
   );
 

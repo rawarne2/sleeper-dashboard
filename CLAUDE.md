@@ -40,15 +40,22 @@ This is a **React + TypeScript + Vite** frontend for a Sleeper fantasy football 
 ### Component structure
 
 - `App.tsx` — Lazy-loads `Dashboard`
-- `Dashboard.tsx` — Main page: header with league info, legend modal, league picker modal, team list
-- `components/TeamPanel.tsx` — Expandable team card with roster details
-- `components/RosterTable.tsx` — Player table within a team panel
+- `Dashboard.tsx` — Shell: header with league info, hash-tab bar (`#standings`/`#all-players`/`#trade-analyzer`), legend + league-picker modals. Each tab renders a page.
+- `pages/LeagueStandingsPage.tsx` — Standings tab: league/rankings meta chips + the `TeamPanel` list
+- `pages/AllPlayersPage.tsx` — Sortable all-players grid (standalone; reads `/api/players/all`)
+- `pages/TradeAnalyzerPage.tsx` — Trade proposal analyzer
+- `components/TeamPanel.tsx` — Expandable team card; renders a `RosterTable`
+- `components/RosterTable.tsx` — Standings roster table (team grouping, expand-to-detail)
+- `components/playerTable/` — Shared player-table building blocks used by **both** the roster table and the All Players grid:
+  - `PlayerStatRow.tsx` / `PlayerStatHeader.tsx` — the shared row + two-row header (separate Consensus/KTC/FC columns; conditional Redraft column when redraft)
+  - `layout.tsx` — `Cell`/`LeafTh`/`GroupTh`, zebra/edge constants, `statColumnCount()` (drives full-width `colSpan`s)
+  - `cells.tsx` — `ConsensusCell`, `SourceValueCell`, `NumCell`, `TrendCell`
 - `components/LeaguePickerCard.tsx` — First-visit modal and league switcher
 - `components/LegendModal.tsx` — Stat description overlay
 
 ### IndexedDB schema (version 4)
 
-Uses the `idb` wrapper. Database name: `sleeper-players-db`. Stores: `app_prefs`, `bundle_cache`.
+Uses the `idb` wrapper. Database name: `sleeper-players-db`. Stores: `app_prefs` (league id + per-league resolved KTC config) and `bundle_cache` (the raw dashboard bundle, keyed by league/season/format/redraft/TEP). No per-player stores.
 
 ## Styling
 
