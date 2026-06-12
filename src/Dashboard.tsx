@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { InformationCircleIcon } from '@heroicons/react/24/outline';
 import { useLeague } from './useLeague';
-import { getLeagueStatusInfo } from './utils/teamStats';
-import { formatKtcLastUpdatedDate } from './utils/formatting';
-import { TeamPanel } from './components/TeamPanel';
 import { LeaguePickerCard } from './components/LeaguePickerCard';
 import { LegendModal } from './components/LegendModal';
 import { TradeAnalyzerPage } from './pages/TradeAnalyzerPage';
 import AllPlayersPage from './pages/AllPlayersPage';
+import LeagueStandingsPage from './pages/LeagueStandingsPage';
 
 /** Horizontal padding shared by header and tab bar. */
 const dashboardShell = 'w-full px-3 sm:px-5 md:px-6';
@@ -27,47 +25,17 @@ function setDashboardHash(tab: DashboardTab) {
   window.location.hash = next;
 }
 
-const metaPillBase =
-  'lbl inline-flex max-w-full items-baseline gap-1 rounded-full border border-line-soft px-2 py-0.5 text-[11px] leading-tight sm:px-2.5 sm:py-1';
-
-function HeaderPill({
-  label,
-  value,
-  className = 'bg-surface-card',
-}: {
-  label: string;
-  value: string;
-  className?: string;
-}) {
-  return (
-    <span className={`${metaPillBase} ${className}`} title={`${label}: ${value}`}>
-      <span className='lbl shrink-0 text-ink-dim'>{label}:</span>
-      <span className='truncate text-ink-mid'>{value}</span>
-    </span>
-  );
-}
-
 const Dashboard: React.FC = () => {
   const {
-    teamsData,
-    playerOwnership,
     league,
-    researchMeta,
-    bundleSeason,
-    ktcLastUpdated,
-    championUserId,
     loading,
-    // refreshing,
     error,
     leagueIdReady,
     selectedLeagueId,
     setSelectedLeagueId,
     clearStoredLeague,
-    // refreshData,
   } = useLeague();
 
-  const [expandedTeam, setExpandedTeam] = useState<number | null>(null);
-  const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   const [leaguePickerOpen, setLeaguePickerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<DashboardTab>(() =>
@@ -147,15 +115,6 @@ const Dashboard: React.FC = () => {
     </div>
   );
 
-  const handleTeamClick = (rosterId: number) => {
-    setExpandedTeam(expandedTeam === rosterId ? null : rosterId);
-    setExpandedPlayer(null);
-  };
-
-  const handlePlayerClick = (playerId: string) => {
-    setExpandedPlayer(expandedPlayer === playerId ? null : playerId);
-  };
-
   if (!leagueIdReady) {
     return (
       <div className='bg-surface-base text-white min-h-screen p-3 flex flex-col justify-center items-center gap-3'>
@@ -204,71 +163,6 @@ const Dashboard: React.FC = () => {
       </div>
     );
   }
-
-  const leagueStatus = league ? getLeagueStatusInfo(league.status) : null;
-
-  const renderTeamList = () =>
-    teamsData.map((team, idx) => (
-      <TeamPanel
-        key={team.roster.roster_id}
-        teamData={team}
-        index={idx}
-        rosterDetailsPending={false}
-        champId={championUserId}
-        expandedTeam={expandedTeam}
-        onTeamClick={handleTeamClick}
-        expandedPlayer={expandedPlayer}
-        onPlayerClick={handlePlayerClick}
-        playerOwnership={playerOwnership}
-        bundleSeason={bundleSeason}
-        leagueSeason={league?.season ?? null}
-        researchWeek={researchMeta?.week ?? null}
-      />
-    ));
-
-  const researchWeek = researchMeta?.week ?? null;
-  const ktcUpdatedLabel = formatKtcLastUpdatedDate(ktcLastUpdated);
-
-  const showStandingsMeta =
-    leagueStatus ||
-    league?.season ||
-    researchWeek != null ||
-    league?.total_rosters != null ||
-    !loading;
-
-  const standingsMetaChips = showStandingsMeta ? (
-    <div
-      className={`${dashboardShell} mb-3 flex flex-wrap items-center justify-center gap-1 sm:gap-1.5 sm:mb-4`}
-      aria-label='League and rankings metadata'
-    >
-      {leagueStatus && (
-        <span className={`${metaPillBase} ${leagueStatus.className}`}>
-          {leagueStatus.label}
-        </span>
-      )}
-      {league?.season && <HeaderPill label='League season' value={league.season} />}
-      {!loading && researchWeek != null && (
-        <span
-          className={`${metaPillBase} bg-surface-card text-ink-mid`}
-          title={`Sleeper research week ${researchWeek}`}
-        >
-          <span className='lbl text-ink-dim'>Sleeper week</span>{' '}
-          <span>{researchWeek}</span>
-        </span>
-      )}
-      {league?.total_rosters != null && (
-        <HeaderPill label='Teams' value={String(league.total_rosters)} />
-      )}
-      {!loading && (
-        <>
-          <HeaderPill label='Rankings' value='Consensus · KTC + FantasyCalc' />
-          {ktcUpdatedLabel && (
-            <HeaderPill label='KTC last updated' value={ktcUpdatedLabel} />
-          )}
-        </>
-      )}
-    </div>
-  ) : null;
 
   return (
     <div className='bg-surface-base text-white min-h-screen flex flex-col w-full'>
@@ -366,13 +260,7 @@ const Dashboard: React.FC = () => {
         ) : (
           <div className='grid grid-cols-1 gap-4'>
             {activeTab === 'standings' ? (
-              <div className='bg-surface-raised justify-center rounded-lg'>
-                <div className='league-standings-heading text-lg sm:text-2xl font-semibold text-primary-main text-center mt-4 mb-2 sm:mt-6 sm:mb-2.5'>
-                  League Standings
-                </div>
-                {standingsMetaChips}
-                {renderTeamList()}
-              </div>
+              <LeagueStandingsPage />
             ) : (
               <div className='bg-surface-raised py-4 sm:py-5'>
                 <TradeAnalyzerPage />
