@@ -539,6 +539,8 @@ export interface LeagueContextType {
     /** Draft picks for the loaded league (from dashboard bundle `picks_by_roster`). */
     tradePicksByRoster: Map<number, TradeAnalyzerPick[]>;
     league: League | null;
+    /** Resolved KTC identity (format/redraft/TEP) for the loaded league. */
+    ktcConfig: KtcConfig;
     researchMeta: ResearchMeta | null;
     /** Server-resolved season for the loaded bundle; gates season-specific UI like bye week. */
     bundleSeason: string | null;

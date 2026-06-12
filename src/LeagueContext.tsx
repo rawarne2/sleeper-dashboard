@@ -101,6 +101,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   selectedLeagueIdRef.current = selectedLeagueId;
   // Auto-detected KTC identity for the loaded league (replaces the old hardcode).
   const ktcConfigRef = useRef<KtcConfig>(FALLBACK_KTC_CONFIG);
+  // Mirror the ref as state so consumers (All Players, Trade Analyzer) can read the resolved config.
+  const [ktcConfig, setKtcConfig] = useState<KtcConfig>(FALLBACK_KTC_CONFIG);
 
   const initDB = useCallback(async () => {
     return openDB<PlayerDBSchema>(DB_NAME, DB_VERSION, {
@@ -297,23 +299,23 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       if (selectedLeagueIdRef.current !== forLeagueId) return;
 
       const { data, playersMap } = await fetchBundle();
+      applyDashboardBundle(data, playersMap);
 
-      setRosters(data.rosters);
-      setUsers(data.users);
-      setLeague(data.league ?? null);
-      setResearchMeta(data.researchMeta ?? null);
-      setBundleSeason(data.bundleSeason ?? data.league?.season ?? null);
-      setKtcLastUpdated(data.ktcLastUpdated ?? null);
-      setPlayers(playersMap);
-      setPlayerOwnership(data.ownership);
-      setTradePicksByRoster(tradePicksByRosterFromBundle(data));
+      // Re-cache the fresh bundle so a subsequent load paints it immediately.
+      const db = await initDB();
+      const cacheKey = dashboardBundleCacheKey(forLeagueId, ktcConfigRef.current);
+      queueMicrotask(() => {
+        writeCachedDashboardBundle(db, cacheKey, data).catch((e) =>
+          console.warn('IndexedDB bundle cache write failed', e)
+        );
+      });
     } catch (err) {
       console.error('Error refreshing KTC data:', err);
       setError(`Failed to refresh KTC data. ${err}`);
     } finally {
       setRefreshing(false);
     }
-  }, [fetchBundle, selectedLeagueId]);
+  }, [fetchBundle, selectedLeagueId, applyDashboardBundle, initDB]);
 
   const loadFullData = useCallback(async () => {
     const forLeagueId = selectedLeagueId;
@@ -330,6 +332,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
       // Resolve the league's KTC identity: persisted config, else fallback.
       let config = (await getStoredKtcConfig(db, forLeagueId)) ?? FALLBACK_KTC_CONFIG;
       ktcConfigRef.current = config;
+      setKtcConfig(config);
       let cacheKey = dashboardBundleCacheKey(forLeagueId, config);
 
       const cached = await readCachedDashboardBundle(db, cacheKey);
@@ -356,6 +359,8 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
         data = corrected.data;
         playersMap = corrected.playersMap;
       }
+      ktcConfigRef.current = trueConfig;
+      setKtcConfig(trueConfig);
       void putStoredKtcConfig(db, forLeagueId, trueConfig);
 
       applyDashboardBundle(data, playersMap);
@@ -495,6 +500,7 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
     playerOwnership,
     tradePicksByRoster,
     league,
+    ktcConfig,
     researchMeta,
     bundleSeason,
     ktcLastUpdated,
