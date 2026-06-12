@@ -67,6 +67,7 @@ export const TradeAnalyzerPage: React.FC = () => {
     players,
     playerOwnership,
     league,
+    ktcConfig,
     tradePicksByRoster,
     selectedLeagueId,
     bundleSeason,
@@ -74,10 +75,12 @@ export const TradeAnalyzerPage: React.FC = () => {
   } = useLeague();
   const leagueSeason = league?.season != null ? String(league.season) : null;
   const [detailPlayer, setDetailPlayer] = useState<Player | null>(null);
-  const tradeAnalysisSeason = useMemo(
-    () => resolveTradeAnalyzerSeason(league, selectedLeagueId),
-    [league, selectedLeagueId]
-  );
+  const tradeAnalysisSeason = useMemo(() => {
+    // Prefer the server-resolved bundle season; fall back before the bundle loads.
+    const fromBundle = parseInt(bundleSeason ?? '', 10);
+    if (Number.isFinite(fromBundle) && fromBundle > 0) return fromBundle;
+    return resolveTradeAnalyzerSeason(league, selectedLeagueId);
+  }, [bundleSeason, league, selectedLeagueId]);
   const picksByRosterId = useMemo(() => {
     const m = new Map<number, TradeAnalyzerPick[]>();
     for (const [rid, arr] of tradePicksByRoster.entries()) {
@@ -775,6 +778,7 @@ export const TradeAnalyzerPage: React.FC = () => {
                   pick_ids: sideBSelectedPicks.map((p) => canonicalPickId(p)),
                   is_tanking: state.sideB.isTanking,
                 },
+                ktc: ktcConfig,
                 additional_context: state.context.trim() || undefined,
               };
 
