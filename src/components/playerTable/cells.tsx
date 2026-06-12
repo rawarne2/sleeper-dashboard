@@ -38,6 +38,39 @@ export function ValueCell({ values }: { values?: ValuesBlock | null }) {
   );
 }
 
+/** Consensus (KTC+FC blend) hero number + 30-day trend arrow — its own column. */
+export function ConsensusCell({ values }: { values?: ValuesBlock | null }) {
+  const consensus = values?.blended ?? null;
+  const trend = trendInfo(values?.sources?.fantasycalc?.trend_30day);
+  return (
+    <div className='flex items-baseline justify-center gap-1'>
+      <span className='num text-[15px] font-semibold leading-none text-ink-hi'>
+        {formatValue(consensus)}
+      </span>
+      {trend && (
+        <span
+          className={`shrink-0 text-[11px] font-semibold leading-none ${trend.textClass}`}
+          title={trend.label}
+          aria-label={trend.label}
+        >
+          {trend.arrow}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Single source value (KTC or FantasyCalc) in that source's color identity — its own column. */
+export function SourceValueCell({
+  sourceKey,
+  value,
+}: {
+  sourceKey: 'ktc' | 'fantasycalc';
+  value?: number | null;
+}) {
+  return <SourceChip sourceKey={sourceKey} value={value ?? null} />;
+}
+
 /** 30-day trend cell: colored arrow + magnitude (shared by the All Players grid). */
 export function TrendCell({ trend30 }: { trend30?: number | null }) {
   const t = trendInfo(trend30);

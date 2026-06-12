@@ -1,0 +1,61 @@
+import { type ReactNode } from 'react';
+import { ColumnHeader } from './ColumnHeader';
+
+// Subtle zebra tint + group edge keep the wide table scannable. Shared by the
+// roster (League Standings) table and the All Players grid.
+export const COL_A = 'bg-white/[0.025]';
+export const GROUP_EDGE = 'border-l border-line';
+export const cellPad = 'px-1.5 py-1.5';
+
+/** Centered numeric leaf cell with optional zebra tint and group edge. */
+export const Cell = ({
+  children,
+  tint = false,
+  edge = false,
+  width = '',
+}: {
+  children: ReactNode;
+  tint?: boolean;
+  edge?: boolean;
+  width?: string;
+}) => (
+  <td
+    className={`${cellPad} text-center align-middle ${tint ? COL_A : ''} ${
+      edge ? GROUP_EDGE : ''
+    } ${width}`}
+  >
+    {children}
+  </td>
+);
+
+/** Leaf-column header cell wrapping a tooltip-capable ColumnHeader. */
+export const LeafTh = ({
+  label,
+  tip,
+  tint = false,
+  edge = false,
+}: {
+  label: string;
+  tip: string;
+  tint?: boolean;
+  edge?: boolean;
+}) => (
+  <th className={`${cellPad} ${tint ? COL_A : ''} ${edge ? GROUP_EDGE : ''}`} scope='col'>
+    <ColumnHeader label={label} tooltip={tip} />
+  </th>
+);
+
+/** Grouped (colgroup) header spanning several leaf columns. */
+export const GroupTh = ({
+  label,
+  tip,
+  span,
+}: {
+  label: string;
+  tip: string;
+  span: number;
+}) => (
+  <th colSpan={span} scope='colgroup' className={`${cellPad} ${GROUP_EDGE}`}>
+    <ColumnHeader label={label} tooltip={tip} variant='group' />
+  </th>
+);
