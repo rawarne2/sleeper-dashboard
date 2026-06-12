@@ -92,6 +92,56 @@ export function ktcDisplayValues(player: Player): KTCValues | null {
     return player.ktc?.superflexValues ?? player.ktc?.oneQBValues ?? null;
 }
 
+/**
+ * Resolve a player's ownership by precedence: direct `owned`, then the league
+ * ownership map, then the latest research snapshot. Single source of truth for
+ * the roster table, All Players grid, and the player detail panel.
+ */
+export function resolveOwnership(
+    player: Player,
+    ownershipMap: Record<string, { owned: number; started?: number | null }>
+): { owned: number; started: number | null } | null {
+    if (player.owned != null) {
+        return { owned: player.owned, started: player.started ?? null };
+    }
+    const id = player.player_id;
+    if (id && ownershipMap[id]) {
+        const o = ownershipMap[id];
+        return { owned: o.owned, started: o.started ?? null };
+    }
+    const rl = player.research_latest;
+    if (rl?.owned != null) {
+        return { owned: rl.owned, started: rl.started ?? null };
+    }
+    return null;
+}
+
+/** Display name by precedence: `playerName`, then `first_name last_name`, else a fallback. */
+export function playerDisplayName(player: Player): string {
+    return (
+        player.playerName?.trim() ||
+        [player.first_name, player.last_name].filter(Boolean).join(' ').trim() ||
+        'Unknown player'
+    );
+}
+
+/**
+ * Positional rank (e.g. "WR5"), else overall ("#42"), from the backend-resolved
+ * KTC block. The backend already applies league format + TEP + redraft, so this
+ * reads the hoisted top-level values rather than re-selecting nested blocks.
+ */
+export function ktcRankLabel(player: Player): string | null {
+    const v = ktcDisplayValues(player);
+    const pos = (player.position || '').trim().toUpperCase();
+    if (pos && typeof v?.positionalRank === 'number' && Number.isFinite(v.positionalRank)) {
+        return `${pos}${v.positionalRank}`;
+    }
+    if (typeof v?.rank === 'number' && Number.isFinite(v.rank)) {
+        return `#${v.rank}`;
+    }
+    return null;
+}
+
 const SOURCE_LABELS: Record<string, string> = {
   ktc: 'KTC',
   fantasycalc: 'FC',

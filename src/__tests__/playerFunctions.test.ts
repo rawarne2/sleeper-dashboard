@@ -3,8 +3,52 @@ import {
     formatKtcInjury,
     mapBackendPlayerRow,
     playersFromDashboardBundle,
+    resolveOwnership,
+    playerDisplayName,
+    ktcRankLabel,
 } from '../playerFunctions';
 import { Player } from '../types';
+
+describe('resolveOwnership', () => {
+    it('prefers player.owned, then the map, then research_latest, else null', () => {
+        expect(resolveOwnership({ owned: 50, started: 40 } as Player, {})).toEqual({
+            owned: 50,
+            started: 40,
+        });
+        expect(
+            resolveOwnership({ player_id: 'x' } as Player, { x: { owned: 30, started: 20 } })
+        ).toEqual({ owned: 30, started: 20 });
+        expect(
+            resolveOwnership(
+                { research_latest: { week: 5, owned: 10, started: 5 } } as Player,
+                {}
+            )
+        ).toEqual({ owned: 10, started: 5 });
+        expect(resolveOwnership({} as Player, {})).toBeNull();
+    });
+});
+
+describe('playerDisplayName', () => {
+    it('prefers playerName, then first+last, else a fallback', () => {
+        expect(playerDisplayName({ playerName: 'Ja Marr Chase' } as Player)).toBe('Ja Marr Chase');
+        expect(
+            playerDisplayName({ first_name: 'Bijan', last_name: 'Robinson' } as Player)
+        ).toBe('Bijan Robinson');
+        expect(playerDisplayName({} as Player)).toBe('Unknown player');
+    });
+});
+
+describe('ktcRankLabel', () => {
+    it('uses positional rank, then overall, from the backend-resolved block', () => {
+        expect(
+            ktcRankLabel({ position: 'WR', ktc: { superflexValues: { positionalRank: 5 } } } as Player)
+        ).toBe('WR5');
+        expect(
+            ktcRankLabel({ position: 'WR', ktc: { oneQBValues: { rank: 42 } } } as Player)
+        ).toBe('#42');
+        expect(ktcRankLabel({ position: 'WR', ktc: {} } as Player)).toBeNull();
+    });
+});
 
 const mockBackendPlayers = [
     {
