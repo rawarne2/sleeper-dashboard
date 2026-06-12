@@ -9,6 +9,11 @@ import type {
   TradeAnalyzerRequest,
   TradeAnalyzerResponse,
 } from '../types';
+import {
+  ktcDisplayValues,
+  ktcRankLabel,
+  playerDisplayName as sharedPlayerDisplayName,
+} from '../playerFunctions';
 
 const DB_NAME = 'sleeper-players-db';
 const DB_VERSION = 4;
@@ -22,32 +27,20 @@ async function openPrefsDb() {
   return openDB(DB_NAME, DB_VERSION);
 }
 
+// The backend already resolves KTC values per league format + TEP + redraft and
+// hoists them to the top-level block, so these read `ktcDisplayValues` rather than
+// reaching into a hardcoded `superflexValues.tep` (which broke 1QB / non-TEP leagues).
 export function ktcValueForPlayer(p: Player): number {
-  const v = p.ktc?.superflexValues?.tep?.value;
+  const v = ktcDisplayValues(p)?.value;
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }
 
 export function playerDisplayName(p: Player): string {
-  return (
-    `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() ||
-    p.playerName ||
-    'Player'
-  );
+  return sharedPlayerDisplayName(p);
 }
 
 export function playerRankLabel(p: Player): string | null {
-  const sv = p.ktc?.superflexValues;
-  const tep = sv?.tep;
-  const posRank = tep?.positionalRank ?? sv?.positionalRank;
-  const pos = (p.position || '').trim().toUpperCase();
-  if (pos && typeof posRank === 'number' && Number.isFinite(posRank)) {
-    return `${pos}${posRank}`;
-  }
-  const overall = tep?.rank ?? sv?.rank;
-  if (typeof overall === 'number' && Number.isFinite(overall)) {
-    return `#${overall}`;
-  }
-  return null;
+  return ktcRankLabel(p);
 }
 
 export function buildTradeAnalyzerHistoryEntry(args: {

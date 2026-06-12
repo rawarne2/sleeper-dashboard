@@ -15,6 +15,8 @@ import {
   valueSources,
   blendedValue,
   resolveInjury,
+  resolveOwnership,
+  playerDisplayName,
 } from '../playerFunctions';
 
 const TrendingChip = () => (
@@ -89,25 +91,6 @@ const StaticField = ({ label, value }: { label: string; value: React.ReactNode }
   </div>
 );
 
-function resolveOwnership(
-  player: Player,
-  ownershipMap?: Record<string, { owned: number; started?: number }>
-) {
-  if (player.owned != null) {
-    return { owned: player.owned, started: player.started ?? null };
-  }
-  const id = player.player_id;
-  if (id && ownershipMap?.[id]) {
-    const o = ownershipMap[id];
-    return { owned: o.owned, started: o.started ?? null };
-  }
-  const rl = player.research_latest;
-  if (rl?.owned != null) {
-    return { owned: rl.owned, started: rl.started ?? null };
-  }
-  return null;
-}
-
 export interface PlayerDetailContentProps {
   player: Player;
   bundleSeason: string | null;
@@ -134,7 +117,7 @@ export const PlayerDetailContent = memo(({
   const ktcInjury = formatKtcInjury(ktc?.injury);
   const showBye = showByeForSeason(bundleSeason, leagueSeason) && ktc?.byeWeek != null;
   const stats = player.stats;
-  const ownership = resolveOwnership(player, ownershipMap);
+  const ownership = resolveOwnership(player, ownershipMap ?? {});
   const pickLabel =
     ktc?.pickRound != null && ktc?.pickNum != null
       ? `Rd ${ktc.pickRound} · Pick ${ktc.pickNum}`
@@ -144,10 +127,7 @@ export const PlayerDetailContent = memo(({
           ? `Pick ${ktc.pickNum}`
           : null;
 
-  const displayName =
-    player.playerName?.trim() ||
-    [player.first_name, player.last_name].filter(Boolean).join(' ') ||
-    'Unknown player';
+  const displayName = playerDisplayName(player);
 
   const hasStatusContent =
     (player.status && player.status !== 'Active') ||

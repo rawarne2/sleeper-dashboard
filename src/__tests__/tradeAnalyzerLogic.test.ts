@@ -30,7 +30,8 @@ const player = (id: string, position: string, ktcValue: number): Player =>
     player_id: id,
     playerName: id,
     position,
-    ktc: { superflexValues: { tep: { value: ktcValue } } },
+    // Backend hoists the league's TEP value to the top-level KTC block.
+    ktc: { superflexValues: { value: ktcValue } },
   } as unknown as Player);
 
 const team = (over: {
