@@ -25,17 +25,17 @@ const PlayerDetailRow = memo(
   }) => (
     <tr>
       <td colSpan={colSpan} className='p-0 align-top'>
-        {/* Cap width + sticky-left so the static profile stays a tidy, readable
-            card pinned to the left instead of stretching across the wide table. */}
-        <div className='player-detail-row sticky left-0 w-[min(100vw,60rem)] max-w-full'>
-          <PlayerDetailContent
-            player={player}
-            bundleSeason={bundleSeason}
-            leagueSeason={leagueSeason}
-            researchWeek={researchWeek}
-            ownershipMap={playerOwnership}
-            compact
-          />
+        <div className='player-detail-row w-full'>
+          <div className='sticky left-0 w-[min(100vw,72rem)] max-w-full'>
+            <PlayerDetailContent
+              player={player}
+              bundleSeason={bundleSeason}
+              leagueSeason={leagueSeason}
+              researchWeek={researchWeek}
+              ownershipMap={playerOwnership}
+              compact
+            />
+          </div>
         </div>
       </td>
     </tr>
