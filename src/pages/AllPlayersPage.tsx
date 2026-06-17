@@ -9,7 +9,7 @@ import {
 import type { KtcConfig, Player } from '../types';
 import { API_CONFIG, buildApiUrl } from '../apiConfig';
 import { useLeague } from '../useLeague';
-import { mapBackendPlayerRow, ktcDisplayValues } from '../playerFunctions';
+import { mapBackendPlayerRow, ktcDisplayValues, resolveOwnership } from '../playerFunctions';
 import { ktcConfigParams, availablePositions } from '../utils/leagueConfig';
 import { playersAllCacheKey, readPlayersAllCache, writePlayersAllCache } from '../playersAllCache';
 import { positionColorVar } from '../utils/valueDisplay';
@@ -27,6 +27,7 @@ import { DashboardSectionMeta } from '../components/DashboardSectionMeta';
 
 interface Row {
   player: Player;
+  team: string;
   consensus: number | null;
   trend: number | null;
   ktc: number | null;
@@ -35,8 +36,15 @@ interface Row {
   vol: number | null;
   liq: number | null;
   own: number | null;
+  start: number | null;
+  avg: number | null;
+  tot: number | null;
+  ros: number | null;
+  projWeek: number | null;
   overallRank: number | null;
   overallTier: number | null;
+  positionalRank: number | null;
+  positionalTier: number | null;
 }
 
 const PostureToggle = ({
@@ -63,7 +71,8 @@ const PostureToggle = ({
 );
 
 export default function AllPlayersPage() {
-  const { ktcConfig, playerOwnership, bundleSeason, league, selectedLeagueId } = useLeague();
+  const { ktcConfig, playerOwnership, bundleSeason, league, selectedLeagueId, researchMeta } =
+    useLeague();
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const togglePlayer = (id: string) => setExpandedPlayer((c) => (c === id ? null : id));
 
@@ -146,9 +155,11 @@ export default function AllPlayersPage() {
       const v = player.values;
       const fc = v?.sources?.fantasycalc;
       const ktcv = ktcDisplayValues(player);
-      const ownEntry = player.player_id ? playerOwnership[player.player_id] : undefined;
+      const ownEntry = resolveOwnership(player, playerOwnership);
+      const proj = v?.projection;
       return {
         player,
+        team: player.team ?? '',
         consensus: v?.blended ?? null,
         trend: fc?.trend_30day ?? null,
         ktc: v?.sources?.ktc?.value ?? null,
@@ -156,9 +167,16 @@ export default function AllPlayersPage() {
         redraft: fc?.redraft_value ?? null,
         vol: fc?.volatility ?? null,
         liq: fc?.trade_frequency ?? null,
-        own: ownEntry?.owned ?? player.research_latest?.owned ?? null,
+        own: ownEntry?.owned ?? null,
+        start: ownEntry?.started ?? null,
+        avg: player.stats?.average_points ?? null,
+        tot: player.stats?.total_points ?? null,
+        ros: proj?.proj_ros ?? null,
+        projWeek: proj?.proj_week ?? null,
         overallRank: ktcv?.rank ?? null,
         overallTier: ktcv?.overallTier ?? null,
+        positionalRank: ktcv?.positionalRank ?? null,
+        positionalTier: ktcv?.positionalTier ?? null,
       };
     });
   }, [players, playerOwnership]);
@@ -179,6 +197,20 @@ export default function AllPlayersPage() {
     const dir = sortDir === 'asc' ? 1 : -1;
     const get = (r: Row): number | null => {
       switch (sortKey) {
+        case 'team':
+          return null;
+        case 'own':
+          return r.own;
+        case 'start':
+          return r.start;
+        case 'avg':
+          return r.avg;
+        case 'tot':
+          return r.tot;
+        case 'ros':
+          return r.ros;
+        case 'week':
+          return r.projWeek;
         case 'trend':
           return r.trend;
         case 'ktc':
@@ -191,17 +223,29 @@ export default function AllPlayersPage() {
           return r.vol;
         case 'liq':
           return r.liq;
+        case 'rankPos':
+          return r.positionalRank;
         case 'rank':
           return r.overallRank;
+        case 'tierPos':
+          return r.positionalTier;
         case 'tier':
           return r.overallTier;
-        case 'own':
-          return r.own;
         default:
           return r.consensus;
       }
     };
     // Missing values always sort last, regardless of direction.
+    if (sortKey === 'team') {
+      return [...out].sort((a, b) => {
+        const at = a.team.trim().toUpperCase();
+        const bt = b.team.trim().toUpperCase();
+        if (!at && !bt) return 0;
+        if (!at) return 1;
+        if (!bt) return -1;
+        return at.localeCompare(bt) * dir;
+      });
+    }
     return [...out].sort((a, b) => {
       const av = get(a);
       const bv = get(b);
@@ -322,6 +366,7 @@ export default function AllPlayersPage() {
               variant='all-players'
               showRedraft={config.is_redraft}
               sort={{ dirFor, onSort }}
+              projectedWeek={researchMeta?.week ?? null}
             />
             <tbody>
               {visible.map((r, i) => (
