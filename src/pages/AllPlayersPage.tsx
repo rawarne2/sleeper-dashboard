@@ -218,14 +218,17 @@ export default function AllPlayersPage() {
             value={String(config.is_redraft)}
             onChange={(v) => setConfig((c) => ({ ...c, is_redraft: v === 'true' }))}
           />
-          <PostureToggle
-            options={[
-              { label: 'TEP', value: 'tep' },
-              { label: 'No TEP', value: '' },
-            ]}
-            value={config.tep_level === '' ? '' : 'tep'}
-            onChange={(v) => setConfig((c) => ({ ...c, tep_level: v as KtcConfig['tep_level'] }))}
-          />
+          <label className='inline-flex items-center gap-1.5 text-[11px] text-ink-mid'>
+            <span className='lbl'>TE Premium</span>
+            <select value={config.tep_level ?? ''}
+              onChange={(e) => setConfig((c) => ({ ...c, tep_level: e.target.value as KtcConfig['tep_level'] }))}
+              className='rounded-md border border-line bg-surface-overlay px-2 py-1 text-sm text-ink-hi focus:border-cons/50 focus:outline-none'>
+              <option value=''>No TEP</option>
+              <option value='tep'>TEP (+0.5)</option>
+              <option value='tepp'>TEPP (+1.0)</option>
+              <option value='teppp'>TEPPP (+1.5)</option>
+            </select>
+          </label>
         </div>
 
         <input
