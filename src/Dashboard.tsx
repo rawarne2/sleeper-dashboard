@@ -167,13 +167,22 @@ const Dashboard: React.FC = () => {
     return (
       <div className='bg-surface-base text-white min-h-screen p-3 flex flex-col justify-center items-center gap-4'>
         <div className='text-xl text-red-500 text-center max-w-lg'>{error}</div>
-        <button
-          type='button'
-          className='text-sm text-gray-400 underline hover:text-white'
-          onClick={() => clearStoredLeague()}
-        >
-          Use a different league ID
-        </button>
+        <div className='flex items-center gap-3'>
+          <button
+            type='button'
+            className='rounded-md border border-primary-main/70 px-3 py-1.5 text-sm text-primary-light hover:bg-primary-main/10 transition-colors'
+            onClick={() => window.location.reload()}
+          >
+            Retry
+          </button>
+          <button
+            type='button'
+            className='text-sm text-gray-400 underline hover:text-white'
+            onClick={() => clearStoredLeague()}
+          >
+            Use a different league ID
+          </button>
+        </div>
       </div>
     );
   }
