@@ -306,6 +306,45 @@ export function resolveInjury(player: Player): InjuryDisplay | null {
     return null;
 }
 
+export interface InjuryBadge {
+    /** Short status code shown inline in the table row, e.g. "Q", "OUT", "IR". */
+    code: string;
+    /** Visual severity: danger = out for the game, warn = game-time decision. */
+    tone: 'danger' | 'warn';
+    /** Tooltip with the full status + source. */
+    title: string;
+}
+
+const INJURY_CODES: ReadonlyArray<readonly [RegExp, string]> = [
+    [/injured reserve|^ir\b/i, 'IR'],
+    [/\bout\b|^o\b/i, 'OUT'],
+    [/pup/i, 'PUP'],
+    [/susp/i, 'SUS'],
+    [/doubt|^d\b/i, 'D'],
+    [/quest|^q\b/i, 'Q'],
+];
+
+const INJURY_DANGER = new Set(['OUT', 'IR', 'PUP', 'SUS']);
+
+function injuryCode(status: string): string {
+    for (const [re, code] of INJURY_CODES) if (re.test(status)) return code;
+    return 'INJ';
+}
+
+/** Compact injury indicator for a table row — a short code + severity tone, or null when healthy. */
+export function injuryBadge(player: Player): InjuryBadge | null {
+    const injury = resolveInjury(player);
+    if (!injury) return null;
+    const status = (player.injury_status || player.weekly_injury_status || injury.text || '').trim();
+    if (!status) return null;
+    const code = injuryCode(status);
+    return {
+        code,
+        tone: INJURY_DANGER.has(code) ? 'danger' : 'warn',
+        title: `Injury · ${injury.source}: ${injury.text}`,
+    };
+}
+
 /** Only show bye week when viewing the current bundle season. */
 export function showByeForSeason(
     bundleSeason: string | null | undefined,

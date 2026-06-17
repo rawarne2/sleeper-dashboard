@@ -81,7 +81,6 @@ export default function LeagueStandingsPage() {
         )}
         {!loading && (
           <>
-            <HeaderPill label='Rankings' value='Consensus · KTC + FantasyCalc' />
             {ktcUpdatedLabel && <HeaderPill label='KTC last updated' value={ktcUpdatedLabel} />}
             {researchUpdated && <HeaderPill label='Sleeper updated' value={researchUpdated} />}
           </>

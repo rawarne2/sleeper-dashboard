@@ -9,7 +9,13 @@ import {
   formatDecimal,
   formatLiquidity,
 } from '../../utils/valueDisplay';
-import { ktcDisplayValues, resolveOwnership, playerDisplayName } from '../../playerFunctions';
+import {
+  ktcDisplayValues,
+  resolveOwnership,
+  playerDisplayName,
+  injuryBadge,
+  type InjuryBadge,
+} from '../../playerFunctions';
 import type { OwnershipMap } from '../RosterTable';
 import { PositionBadge } from './PositionBadge';
 import { ConsensusCell, SourceValueCell, NumCell, TrendCell } from './cells';
@@ -18,6 +24,21 @@ import { Cell, cellPad, GROUP_EDGE } from './layout';
 const TrendingChip = () => (
   <span className='ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide bg-amber-500/15 text-amber-300 border border-amber-500/30'>
     Trending
+  </span>
+);
+
+/** Compact injury indicator: a short status code, color-coded by severity. */
+const InjuryChip = ({ badge }: { badge: InjuryBadge }) => (
+  <span
+    title={badge.title}
+    aria-label={badge.title}
+    className={`inline-flex shrink-0 items-center rounded px-1 py-0.5 text-[10px] font-semibold uppercase leading-none border ${
+      badge.tone === 'danger'
+        ? 'bg-red-500/15 text-red-300 border-red-500/30'
+        : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+    }`}
+  >
+    {badge.code}
   </span>
 );
 
@@ -60,16 +81,18 @@ export const PlayerStatRow = memo((props: PlayerStatRowProps) => {
         ? 'border-l-2 border-l-amber-500/40'
         : '';
   const showTrending = !expanded && player.ktc?.isTrending === true;
+  const injury = injuryBadge(player);
 
   const playerCell = (
     <td
       className={`${cellPad} align-middle sticky left-0 z-10 bg-[#0e2034] group-hover:bg-[#162640] border-r border-line`}
     >
-      <div className='flex items-center gap-2'>
+      <div className='flex items-center gap-1.5'>
         <PositionBadge position={player.position} className='shrink-0' />
         <span className='min-w-0 truncate text-sm font-medium leading-tight text-ink-hi sm:text-base'>
           {playerDisplayName(player)}
         </span>
+        {injury && <InjuryChip badge={injury} />}
         {showTrending && <TrendingChip />}
       </div>
     </td>

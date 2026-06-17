@@ -77,7 +77,7 @@ export function PlayerStatHeader({ variant, showRedraft, sort }: PlayerStatHeade
       <LeafTh label='ROS' tip='Rest-of-season projected fantasy points' edge />
       <LeafTh label='Wk' tip="Next week's projected fantasy points" tint />
       <ValTh label='Consensus' tip='Consensus — average of KTC and FantasyCalc.' k='consensus' edge sort={sort} />
-      <ValTh label='30d' tip='FantasyCalc 30-day value trend (arrow + change).' k='trend' tint sort={sort} />
+      <ValTh label='30 Day' tip='FantasyCalc 30-day value trend (arrow + change).' k='trend' tint sort={sort} />
       <ValTh sort={sort} label='KTC' tip='KeepTradeCut trade value' />
       <ValTh sort={sort} label='FC' tip="FantasyCalc trade value (this league's PPR / team count)." tint />
       {showRedraft && (
