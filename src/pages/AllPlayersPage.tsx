@@ -19,6 +19,7 @@ import { statColumnCount } from '../components/playerTable/layout';
 interface Row {
   player: Player;
   consensus: number | null;
+  trend: number | null;
   redraft: number | null;
   vol: number | null;
   liq: number | null;
@@ -118,6 +119,7 @@ export default function AllPlayersPage() {
       return {
         player,
         consensus: v?.blended ?? null,
+        trend: fc?.trend_30day ?? null,
         redraft: fc?.redraft_value ?? null,
         vol: fc?.volatility ?? null,
         liq: fc?.trade_frequency ?? null,
@@ -144,6 +146,7 @@ export default function AllPlayersPage() {
     const dir = sortDir === 'asc' ? 1 : -1;
     const get = (r: Row): number | null => {
       switch (sortKey) {
+        case 'trend': return r.trend;
         case 'redraft':
           return r.redraft;
         case 'vol':
