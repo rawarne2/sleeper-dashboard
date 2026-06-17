@@ -43,6 +43,14 @@ const Dashboard: React.FC = () => {
       ? 'standings'
       : normalizeDashboardHash(window.location.hash)
   );
+  const [visited, setVisited] = useState<Set<DashboardTab>>(() => new Set([
+    typeof window === 'undefined'
+      ? 'standings'
+      : normalizeDashboardHash(window.location.hash)
+  ]));
+  useEffect(() => {
+    setVisited((c) => (c.has(activeTab) ? c : new Set(c).add(activeTab)));
+  }, [activeTab]);
 
   useEffect(() => {
     const onHashChange = () => {
@@ -247,25 +255,29 @@ const Dashboard: React.FC = () => {
       {tabBar}
 
       <div className='flex-1'>
-        {/* All Players is standalone — it must not wait on the league bundle. */}
-        {activeTab === 'all-players' ? (
-          <div className='bg-surface-raised py-4 sm:py-5'>
+        {visited.has('all-players') && (
+          <div className={activeTab === 'all-players' ? 'bg-surface-raised py-4 sm:py-5' : 'hidden'}>
             <AllPlayersPage />
           </div>
-        ) : loading ? (
-          <div className='flex flex-col justify-center items-center h-[50vh] gap-3'>
-            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-main' />
-            <div className='text-xl'>Loading league data…</div>
-          </div>
-        ) : (
-          <div className='grid grid-cols-1 gap-4'>
-            {activeTab === 'standings' ? (
-              <LeagueStandingsPage />
-            ) : (
-              <div className='bg-surface-raised py-4 sm:py-5'>
-                <TradeAnalyzerPage />
+        )}
+        {visited.has('standings') && (
+          <div className={activeTab === 'standings' ? 'block' : 'hidden'}>
+            {loading ? (
+              <div className='flex flex-col justify-center items-center h-[50vh] gap-3'>
+                <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-main' />
+                <div className='text-xl'>Loading league data…</div>
               </div>
-            )}
+            ) : (<div className='grid grid-cols-1 gap-4'><LeagueStandingsPage /></div>)}
+          </div>
+        )}
+        {visited.has('trade-analyzer') && (
+          <div className={activeTab === 'trade-analyzer' ? 'bg-surface-raised py-4 sm:py-5' : 'hidden'}>
+            {loading ? (
+              <div className='flex flex-col justify-center items-center h-[50vh] gap-3'>
+                <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-main' />
+                <div className='text-xl'>Loading league data…</div>
+              </div>
+            ) : (<TradeAnalyzerPage />)}
           </div>
         )}
       </div>
