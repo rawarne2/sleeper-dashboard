@@ -1,7 +1,7 @@
 import { ColumnHeader, type SortDirection } from './ColumnHeader';
 import { LeafTh, GroupTh, cellPad, COL_A, GROUP_EDGE } from './layout';
 
-export type StatSortKey = 'consensus' | 'redraft' | 'vol' | 'liq' | 'rank' | 'tier' | 'own';
+export type StatSortKey = 'consensus' | 'trend' | 'redraft' | 'vol' | 'liq' | 'rank' | 'tier' | 'own';
 
 interface StatSort {
   dirFor: (k: StatSortKey) => SortDirection;
@@ -50,7 +50,7 @@ function ValTh({
 }
 
 export function PlayerStatHeader({ variant, showRedraft, sort }: PlayerStatHeaderProps) {
-  const tradeSpan = showRedraft ? 6 : 5;
+  const tradeSpan = showRedraft ? 7 : 6;
 
   const groupRow = (
     <>
@@ -76,13 +76,8 @@ export function PlayerStatHeader({ variant, showRedraft, sort }: PlayerStatHeade
       <LeafTh label='GP' tip='Games played this season' />
       <LeafTh label='ROS' tip='Rest-of-season projected fantasy points' edge />
       <LeafTh label='Wk' tip="Next week's projected fantasy points" tint />
-      <ValTh
-        sort={sort}
-        label='Consensus'
-        tip='Consensus — average of KTC and FantasyCalc. Arrow shows the 30-day trend.'
-        k='consensus'
-        edge
-      />
+      <ValTh label='Consensus' tip='Consensus — average of KTC and FantasyCalc.' k='consensus' edge sort={sort} />
+      <ValTh label='30d' tip='FantasyCalc 30-day value trend (arrow + change).' k='trend' tint sort={sort} />
       <ValTh sort={sort} label='KTC' tip='KeepTradeCut trade value' />
       <ValTh sort={sort} label='FC' tip='FantasyCalc trade value' tint />
       {showRedraft && (

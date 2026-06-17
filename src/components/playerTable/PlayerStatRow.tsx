@@ -12,7 +12,7 @@ import {
 import { ktcDisplayValues, resolveOwnership, playerDisplayName } from '../../playerFunctions';
 import type { OwnershipMap } from '../RosterTable';
 import { PositionBadge } from './PositionBadge';
-import { ConsensusCell, SourceValueCell, NumCell } from './cells';
+import { ConsensusCell, SourceValueCell, NumCell, TrendCell } from './cells';
 import { Cell, cellPad, GROUP_EDGE } from './layout';
 
 const TrendingChip = () => (
@@ -125,42 +125,17 @@ export const PlayerStatRow = memo((props: PlayerStatRowProps) => {
 
   const valueRunCells = (
     <>
-      <td className={`${cellPad} text-center align-middle ${GROUP_EDGE} min-w-[72px]`}>
-        <ConsensusCell values={v} />
-      </td>
-      <Cell>
-        <SourceValueCell sourceKey='ktc' value={v?.sources?.ktc?.value} />
-      </Cell>
-      <Cell tint>
-        <SourceValueCell sourceKey='fantasycalc' value={fc?.value} />
-      </Cell>
-      {showRedraft && (
-        <Cell>
-          <NumCell>{formatValue(fc?.redraft_value)}</NumCell>
-        </Cell>
-      )}
-      <Cell tint>
-        <NumCell>{formatCount(fc?.volatility)}</NumCell>
-      </Cell>
-      <Cell>
-        <NumCell>{formatLiquidity(fc?.trade_frequency)}</NumCell>
-      </Cell>
-      <Cell edge>
-        <NumCell tone='strong'>
-          {ktcv?.positionalRank != null ? `${player.position}${ktcv.positionalRank}` : '—'}
-        </NumCell>
-      </Cell>
-      <Cell tint>
-        <NumCell>{formatCount(ktcv?.rank)}</NumCell>
-      </Cell>
-      <Cell edge>
-        <NumCell tone='strong'>
-          {ktcv?.positionalTier != null ? `T${ktcv.positionalTier}` : '—'}
-        </NumCell>
-      </Cell>
-      <Cell tint>
-        <NumCell>{ktcv?.overallTier != null ? `T${ktcv.overallTier}` : '—'}</NumCell>
-      </Cell>
+      <td className={`${cellPad} text-center align-middle ${GROUP_EDGE} min-w-[72px]`}><ConsensusCell values={v} /></td>
+      <Cell><TrendCell trend30={fc?.trend_30day} /></Cell>
+      <Cell tint><SourceValueCell sourceKey='ktc' value={v?.sources?.ktc?.value} /></Cell>
+      <Cell><SourceValueCell sourceKey='fantasycalc' value={fc?.value} /></Cell>
+      {showRedraft && <Cell tint><NumCell>{formatValue(fc?.redraft_value)}</NumCell></Cell>}
+      <Cell><NumCell>{formatCount(fc?.volatility)}</NumCell></Cell>
+      <Cell tint><NumCell>{formatLiquidity(fc?.trade_frequency)}</NumCell></Cell>
+      <Cell edge><NumCell tone='strong'>{ktcv?.positionalRank != null ? `${player.position}${ktcv.positionalRank}` : '—'}</NumCell></Cell>
+      <Cell tint><NumCell>{formatCount(ktcv?.rank)}</NumCell></Cell>
+      <Cell edge><NumCell tone='strong'>{ktcv?.positionalTier != null ? `T${ktcv.positionalTier}` : '—'}</NumCell></Cell>
+      <Cell tint><NumCell>{ktcv?.overallTier != null ? `T${ktcv.overallTier}` : '—'}</NumCell></Cell>
     </>
   );
 

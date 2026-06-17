@@ -54,10 +54,10 @@ export function statColumnCount(
   variant: 'standings' | 'all-players',
   showRedraft: boolean
 ): number {
-  const run = showRedraft ? 10 : 9;
-  const common = 2 + 3 + 2 + run; // Own/Start + Season + Proj + run
-  if (variant === 'standings') return 1 + common + 1; // Player + common + expand
-  return 1 + 1 + 1 + common; // # + Player + Team + common
+  const run = showRedraft ? 11 : 10;        // +1 for the new 30d column
+  const common = 2 + 3 + 2 + run;           // Own/Start + Season + Proj + run
+  if (variant === 'standings') return 1 + common + 1;   // Player + common + expand
+  return 1 + 1 + 1 + common;                // # + Player + Team + common  (expand cell added in A4)
 }
 
 /** Grouped (colgroup) header spanning several leaf columns. */

@@ -3,24 +3,12 @@ import { ValuesBlock } from '../../types';
 import { formatValue, trendInfo } from '../../utils/valueDisplay';
 import { SourceChip } from '../SourceChip';
 
-/** Consensus (KTC+FC blend) hero number + 30-day trend arrow — its own column. */
+/** Consensus (KTC+FC blend) hero number — its own column (trend is separate now). */
 export function ConsensusCell({ values }: { values?: ValuesBlock | null }) {
   const consensus = values?.blended ?? null;
-  const trend = trendInfo(values?.sources?.fantasycalc?.trend_30day);
   return (
-    <div className='flex items-baseline justify-center gap-1'>
-      <span className='num text-[15px] font-semibold leading-none text-ink-hi'>
-        {formatValue(consensus)}
-      </span>
-      {trend && (
-        <span
-          className={`shrink-0 text-[11px] font-semibold leading-none ${trend.textClass}`}
-          title={trend.label}
-          aria-label={trend.label}
-        >
-          {trend.arrow}
-        </span>
-      )}
+    <div className='flex items-baseline justify-center'>
+      <span className='num text-[15px] font-semibold leading-none text-ink-hi'>{formatValue(consensus)}</span>
     </div>
   );
 }
