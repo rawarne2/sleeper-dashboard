@@ -33,8 +33,10 @@ This is a **React + TypeScript + Vite** frontend for a Sleeper fantasy football 
 
 - `src/types.ts` — All TypeScript interfaces (API responses, Player, Roster, League, IndexedDB schema)
 - `src/playerFunctions.ts` — Backend player row mapping, IndexedDB storage logic, position/status filtering (QB/RB/WR/TE/K only, excludes retired)
-- `src/dashboardBundleCache.ts` — IndexedDB bundle cache read/write, season param resolution for example leagues
-- `src/apiConfig.ts` — API base URL, example league IDs, endpoint builders
+- `src/dashboardBundleCache.ts` — IndexedDB v5 open/upgrade (adds `players_all_cache` store), bundle cache read/write, season param resolution for example leagues
+- `src/playersAllCache.ts` — `/api/players/all` cache helpers: `playersAllCacheKey`, `isFresh`, `readPlayersAllCache`, `writePlayersAllCache`
+- `src/apiConfig.ts` — API base URL, 8 example leagues (`EXAMPLE_LEAGUES`), endpoint builders
+- `src/utils/leagueConfig.ts` — `resolveTepLevel(bonus_rec_te)`, `availablePositions(league)`, `resolveLeagueKtcConfig`
 - `src/utils/teamStats.ts` — Pure stat formatting functions (record, PF, PA, PPG, efficiency)
 
 ### Component structure
@@ -47,15 +49,41 @@ This is a **React + TypeScript + Vite** frontend for a Sleeper fantasy football 
 - `components/TeamPanel.tsx` — Expandable team card; renders a `RosterTable`
 - `components/RosterTable.tsx` — Standings roster table (team grouping, expand-to-detail)
 - `components/playerTable/` — Shared player-table building blocks used by **both** the roster table and the All Players grid:
-  - `PlayerStatRow.tsx` / `PlayerStatHeader.tsx` — the shared row + two-row header (separate Consensus/KTC/FC columns; conditional Redraft column when redraft)
-  - `layout.tsx` — `Cell`/`LeafTh`/`GroupTh`, zebra/edge constants, `statColumnCount()` (drives full-width `colSpan`s)
+  - `PlayerStatRow.tsx` / `PlayerStatHeader.tsx` — the shared row + two-row header. **Consensus and 30-day trend are separate columns** (`TrendCell` is its own `<td>`; `ConsensusCell` no longer embeds trend). Both variants render a trailing expand `<th>`/`<td>`.
+  - `layout.tsx` — `Cell`/`LeafTh`/`GroupTh`, zebra/edge constants, `statColumnCount()` (drives full-width `colSpan`s; all-players variant includes the expand column)
   - `cells.tsx` — `ConsensusCell`, `SourceValueCell`, `NumCell`, `TrendCell`
-- `components/LeaguePickerCard.tsx` — First-visit modal and league switcher
-- `components/LegendModal.tsx` — Stat description overlay
+- `components/LeaguePickerCard.tsx` — First-visit modal and league switcher; shows league **name + config badges** (format, league_type, TEP level)
+- `components/LegendModal.tsx` — Stat description overlay; season-points note references the league's exact Sleeper scoring
 
-### IndexedDB schema (version 4)
+### Tab mounting and state preservation
 
-Uses the `idb` wrapper. Database name: `sleeper-players-db`. Stores: `app_prefs` (league id + per-league resolved KTC config) and `bundle_cache` (the raw dashboard bundle, keyed by league/season/format/redraft/TEP). No per-player stores.
+All three dashboard tabs (`standings`, `all-players`, `trade-analyzer`) are kept **mounted** after first visit; inactive tabs are toggled with `display: none` (`hidden` Tailwind class). This preserves in-progress trade proposals, All Players sort/scroll position, and filter state across tab switches. See `Dashboard.tsx` for the `visited` set pattern.
+
+### Example leagues
+
+`EXAMPLE_LEAGUES` in `src/apiConfig.ts` is an array of 8 objects with shape:
+
+```ts
+{ id: string; name: string; season: number; format: '1qb' | 'superflex';
+  league_type: 'dynasty' | 'redraft' | 'keeper'; tep: 'none' | 'tep' | 'tepp' | 'teppp' }
+```
+
+All four TEP levels, at least one redraft, and at least one 1QB league are covered. The picker shows `name · season` plus format/league_type/TEP badges.
+
+### Position chips and TEP resolution
+
+- **Position chips** in All Players are derived from the league's `roster_positions` via `availablePositions(league)` in `src/utils/leagueConfig.ts`. DEF and K chips are hidden when the league does not roster those positions.
+- **KTC TEP level** is resolved by rounding the league's `bonus_rec_te` scoring value to the nearest bucket via `resolveTepLevel(bonus_rec_te)` (thresholds: < 0.25 → `''`, < 0.75 → `'tep'`, < 1.25 → `'tepp'`, else `'teppp'`).
+- **TEP dropdown** in All Players is a 4-option `<select>` (No TEP / TEP / TEPP / TEPPP) that overrides the scoring on both values and engine points for the displayed rows.
+
+### IndexedDB schema (version 5)
+
+Uses the `idb` wrapper. Database name: `sleeper-players-db`. DB open/upgrade logic lives in `src/db.ts` (extracted from `LeagueContext.tsx`). Stores:
+- `app_prefs` — league id + per-league resolved KTC config
+- `bundle_cache` — the raw dashboard bundle, keyed by league/season/format/redraft/TEP
+- `players_all_cache` — `/api/players/all` responses, keyed by `league_id|format|redraft|tep|season` (added in v5)
+
+`players_all_cache` uses a stale-while-revalidate strategy: cached rows are painted immediately on tab open, but a fresh fetch always runs in the background and overwrites the entry. This ensures a fresh stat ingest is picked up on the next open without showing a reload spinner. See `src/playersAllCache.ts` for the key function (`playersAllCacheKey`) and freshness helpers.
 
 ## Styling
 
