@@ -196,7 +196,7 @@ const Dashboard: React.FC = () => {
       <header className='border-b border-line bg-surface-header'>
         <div className={`${dashboardShell} flex flex-col gap-1 py-2 sm:gap-1.5 sm:py-2.5`}>
           {/* App title */}
-          <h1 className='hd text-center text-xs font-semibold tracking-wide text-ink-dim sm:text-sm'>
+          <h1 className='hd text-center text-base font-semibold tracking-wide text-ink-hi sm:text-lg'>
             Sleeper Dynasty Dashboard
           </h1>
 
@@ -225,19 +225,19 @@ const Dashboard: React.FC = () => {
             <div className='flex shrink-0 items-center justify-center gap-1 md:justify-end md:gap-1.5'>
               <button
                 type='button'
-                className='inline-flex items-center justify-center gap-1 rounded-md border border-line-soft px-2 py-1 text-xs font-medium text-ink-mid transition-colors hover:border-line hover:bg-surface-card hover:text-ink-hi sm:px-2.5 sm:py-1.5'
+                className='inline-flex items-center justify-center gap-1 rounded-md border border-line-soft px-2 py-1 text-xs font-medium text-ink-hi transition-colors hover:border-line hover:bg-surface-card hover:text-ink-hi sm:px-2.5 sm:py-1.5'
                 onClick={() => setLegendOpen(true)}
                 aria-label='Open legend'
               >
                 <InformationCircleIcon className='h-3.5 w-3.5 shrink-0' />
-                <span className='lbl text-[9px] sm:text-[10px]'>Legend</span>
+                <span className='lbl text-[10px] sm:text-[11px]'>Legend</span>
               </button>
               <button
                 type='button'
-                className='inline-flex items-center justify-center rounded-md border border-line-soft px-2 py-1 text-xs font-medium text-ink-mid transition-colors hover:border-line hover:bg-surface-card hover:text-ink-hi sm:px-2.5 sm:py-1.5'
+                className='inline-flex items-center justify-center rounded-md border border-line-soft px-2 py-1 text-xs font-medium text-ink-hi transition-colors hover:border-line hover:bg-surface-card hover:text-ink-hi sm:px-2.5 sm:py-1.5'
                 onClick={() => setLeaguePickerOpen(true)}
               >
-                <span className='lbl text-[9px] sm:text-[10px]'>Change league</span>
+                <span className='lbl text-[10px] sm:text-[11px]'>Change league</span>
               </button>
             </div>
           </div>

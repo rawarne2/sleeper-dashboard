@@ -22,7 +22,6 @@ interface BackendPlayer {
     depth_chart_position?: string | null;
     depth_chart_order?: number;
     fantasy_positions?: string[];
-    rookie_year?: number;
     birth_city?: string;
     birth_state?: string;
     high_school?: string;
@@ -64,7 +63,6 @@ export function mapBackendPlayerRow(player: BackendPlayer): Player | null {
                 : player.position
                   ? [player.position]
                   : [],
-        rookie_year: player.rookie_year,
         birth_city: player.birth_city,
         birth_state: player.birth_state,
         high_school: player.high_school,

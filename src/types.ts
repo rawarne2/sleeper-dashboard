@@ -272,7 +272,6 @@ export interface Player {
     depth_chart_position?: string | null;
     /** Sleeper depth-chart rank (1 = starter). */
     depth_chart_order?: number;
-    rookie_year?: number;
     birth_city?: string;
     birth_state?: string;
     high_school?: string;

@@ -154,7 +154,6 @@ export const PlayerDetailContent = memo(({
     player.depth_chart_order != null
       ? `${player.position ?? player.depth_chart_position ?? ''}${player.depth_chart_order}`
       : player.depth_chart_position ?? '—';
-  const birthplace = [player.birth_city, player.birth_state].filter(Boolean).join(', ') || '—';
   const positionsValue =
     player.fantasy_positions && player.fantasy_positions.length > 0
       ? player.fantasy_positions.join(', ')
@@ -186,10 +185,8 @@ export const PlayerDetailContent = memo(({
               label='Birth date'
               value={player.birth_date ? formatBirthDate(player.birth_date) : '—'}
             />
-            <StaticField label='Birthplace' value={birthplace} />
             <StaticField label='Positions' value={positionsValue} />
             <StaticField label='Status' value={player.status || 'Active'} />
-            <StaticField label='Rookie yr' value={player.rookie_year ?? '—'} />
             <StaticField label='High school' value={player.high_school ?? '—'} />
             <StaticField label='Jersey' value={player.number != null ? `#${player.number}` : '—'} />
             <StaticField label='Team' value={player.team || 'FA'} />
@@ -244,12 +241,6 @@ export const PlayerDetailContent = memo(({
           )}
           {player.fantasy_positions && player.fantasy_positions.length > 0 && (
             <DetailItem label='Positions' value={player.fantasy_positions.join(', ')} />
-          )}
-          {(player.birth_city || player.birth_state) && (
-            <DetailItem label='Birthplace' value={birthplace} />
-          )}
-          {player.rookie_year != null && (
-            <DetailItem label='Rookie yr' value={player.rookie_year} />
           )}
           {player.high_school && (
             <DetailItem Icon={AcademicCapIcon} label='High school' value={player.high_school} />
