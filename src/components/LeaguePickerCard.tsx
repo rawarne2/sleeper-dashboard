@@ -59,19 +59,24 @@ export const LeaguePickerCard: React.FC<LeaguePickerCardProps> = ({
 
       <section className='mb-5'>
         <p className='mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400'>
-          Example Dynasty Superflex Seasons
+          Example Leagues
         </p>
-        <div className='flex flex-wrap gap-2'>
-          {EXAMPLE_LEAGUES.map((l) => (
-            <button
-              key={l.id}
-              type='button'
-              onClick={() => onSelect(l.id)}
-              className='flex-1 min-w-[5rem] rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm font-medium text-gray-100 transition-colors hover:border-primary-main hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-primary-main'
-            >
-              {l.label}
-            </button>
-          ))}
+        <div className='flex flex-col gap-1.5'>
+          {EXAMPLE_LEAGUES.map((l) => {
+            const tepLabel = l.tep === 'none' ? 'No TEP' : l.tep.toUpperCase();
+            const fmtLabel = l.format === '1qb' ? '1QB' : 'SF';
+            return (
+              <button key={l.id} type='button' onClick={() => onSelect(l.id)}
+                className='flex w-full flex-col items-start gap-1 rounded-lg border border-line-soft bg-surface-card px-3 py-2 text-left transition-colors hover:border-line hover:bg-surface-overlay'>
+                <span className='text-sm font-semibold text-ink-hi'>{l.name} <span className='text-ink-dim'>· {l.season}</span></span>
+                <span className='flex flex-wrap gap-1'>
+                  <span className='lbl rounded-full border border-line px-2 py-0.5 text-[10px] text-ink-mid'>{fmtLabel}</span>
+                  <span className='lbl rounded-full border border-line px-2 py-0.5 text-[10px] text-ink-mid capitalize'>{l.league_type}</span>
+                  <span className='lbl rounded-full border border-line px-2 py-0.5 text-[10px] text-ink-mid'>{tepLabel}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
