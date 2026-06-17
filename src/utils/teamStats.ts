@@ -1,4 +1,4 @@
-import { Player, RosterSettings } from '../types';
+import { Player, RosterSettings, TeamData } from '../types';
 
 export function getLeagueStatusInfo(status: string): { label: string; className: string } {
   switch (status.toLowerCase()) {
@@ -76,4 +76,76 @@ export function getEff(s: RosterSettings): string {
   const pf = (s.fpts || 0) + (s.fpts_decimal || 0) / 100;
   const pp = (s.ppts || 0) + (s.ppts_decimal || 0) / 100;
   return pp > 0 ? ((pf / pp) * 100).toFixed(1) + '%' : '0.0%';
+}
+
+const TIER_GOOD = 'text-green-300';
+const TIER_OK = 'text-yellow-300';
+const TIER_BAD = 'text-red-300';
+
+/**
+ * League-relative color tier for a value within its peer set, split into
+ * tertiles. Returns '' (no color) when there are too few teams or every value
+ * is identical — nothing meaningful to rank. Set `higherIsBetter=false` for
+ * stats where lower is better (e.g. Points Against).
+ */
+export function relativeTierClass(
+  value: number,
+  allValues: number[],
+  higherIsBetter: boolean
+): string {
+  const finite = allValues.filter((v) => Number.isFinite(v));
+  if (finite.length < 3 || !Number.isFinite(value)) return '';
+  const min = Math.min(...finite);
+  const max = Math.max(...finite);
+  if (min === max) return '';
+
+  const below = finite.filter((v) => v < value).length;
+  const frac = below / (finite.length - 1); // 0 = lowest, 1 = highest
+  const goodness = higherIsBetter ? frac : 1 - frac;
+  if (goodness >= 2 / 3) return TIER_GOOD;
+  if (goodness >= 1 / 3) return TIER_OK;
+  return TIER_BAD;
+}
+
+/**
+ * Absolute color for lineup efficiency (PF ÷ MaxPF, as a percent). Efficiency
+ * is meaningful on its own, so it uses fixed thresholds rather than a
+ * league-relative rank. Returns '' for non-positive values (e.g. preseason).
+ */
+export function getEfficiencyColor(effPct: number): string {
+  if (!Number.isFinite(effPct) || effPct <= 0) return '';
+  if (effPct >= 95) return TIER_GOOD;
+  if (effPct >= 85) return TIER_OK;
+  return TIER_BAD;
+}
+
+export interface StandingsStatColors {
+  pf: string;
+  pa: string;
+  diff: string;
+  eff: string;
+}
+
+/**
+ * Precompute per-team color tiers for the standings grid: league-relative for
+ * the comparative stats (PF, PA, Diff) and absolute for efficiency. Keyed by
+ * `roster_id` so the memoized `TeamPanel` can look up its own colors.
+ */
+export function buildStandingsStatColors(
+  teams: TeamData[]
+): Map<number, StandingsStatColors> {
+  const pfVals = teams.map((t) => Number(getPF(t.roster.settings)));
+  const paVals = teams.map((t) => Number(getPA(t.roster.settings)));
+  const diffVals = teams.map((_, i) => pfVals[i] - paVals[i]);
+
+  const map = new Map<number, StandingsStatColors>();
+  teams.forEach((t, i) => {
+    map.set(t.roster.roster_id, {
+      pf: relativeTierClass(pfVals[i], pfVals, true),
+      pa: relativeTierClass(paVals[i], paVals, false),
+      diff: relativeTierClass(diffVals[i], diffVals, true),
+      eff: getEfficiencyColor(parseFloat(getEff(t.roster.settings))),
+    });
+  });
+  return map;
 }

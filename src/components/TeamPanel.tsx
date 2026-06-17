@@ -13,8 +13,10 @@ import {
   getPPG,
   getPAG,
   getEff,
+  StandingsStatColors,
 } from '../utils/teamStats';
 import { RosterTable, OwnershipMap } from './RosterTable';
+import { ColumnHeader } from './playerTable/ColumnHeader';
 
 export interface TeamPanelProps {
   teamData: TeamData;
@@ -30,6 +32,7 @@ export interface TeamPanelProps {
   leagueSeason: string | null;
   researchWeek: number | null;
   showRedraft: boolean;
+  statColors?: StandingsStatColors;
 }
 
 export const TeamPanel = memo(({
@@ -46,6 +49,7 @@ export const TeamPanel = memo(({
   leagueSeason,
   researchWeek,
   showRedraft,
+  statColors,
 }: TeamPanelProps) => {
   const { roster, user, starters, bench, reserve, taxi } = teamData;
   const s = roster.settings;
@@ -53,7 +57,13 @@ export const TeamPanel = memo(({
 
   const diff = Number(getPF(s)) - Number(getPA(s));
   const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(2);
-  const diffColor = diff > 0 ? 'text-green-300' : diff < 0 ? 'text-red-300' : 'text-gray-300';
+  // League-relative tier when available; otherwise fall back to sign coloring.
+  const diffColor =
+    statColors?.diff ||
+    (diff > 0 ? 'text-green-300' : diff < 0 ? 'text-red-300' : 'text-gray-300');
+  const pfColor = statColors?.pf || 'text-gray-100';
+  const paColor = statColors?.pa || 'text-gray-100';
+  const effColor = statColors?.eff || 'text-gray-100';
 
   return (
     <div className='team-paper'>
@@ -112,42 +122,47 @@ export const TeamPanel = memo(({
           </div>
         </div>
 
-        {/* Row 2: stats grid — 5 cols on mobile (2 even rows), 10 cols on sm+ (1 row) */}
-        <div className='mt-2 pt-2 border-t border-gray-600/30 grid grid-cols-5 sm:grid-cols-10 gap-y-2 justify-items-center'>
+        {/* Row 2: stats grid — 5 cols on mobile (2 even rows), 10 cols on sm+ (1 row).
+            Headers carry click/hover tooltips; stop propagation so pinning a tip
+            does not also toggle the roster expand. */}
+        <div
+          className='mt-2 pt-2 border-t border-gray-600/30 grid grid-cols-5 sm:grid-cols-10 gap-y-2 justify-items-center'
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className='flex flex-col items-center gap-0.5'>
-            <span className='text-xs text-gray-400'>PF</span>
-            <span className='text-gray-100 font-medium tabular-nums text-xs sm:text-sm'>{getPF(s)}</span>
+            <ColumnHeader label='PF' tooltip='Points For — total points scored' />
+            <span className={`font-medium tabular-nums text-xs sm:text-sm ${pfColor}`}>{getPF(s)}</span>
           </div>
           <div className='flex flex-col items-center gap-0.5'>
-            <span className='text-xs text-gray-400'>PF/G</span>
+            <ColumnHeader label='PF/G' tooltip='Points For per game' />
             <span className='text-gray-100 font-medium tabular-nums text-xs sm:text-sm'>{getPPG(s)}</span>
           </div>
           <div className='flex flex-col items-center gap-0.5'>
-            <span className='text-xs text-gray-400'>PA</span>
-            <span className='text-gray-100 font-medium tabular-nums text-xs sm:text-sm'>{getPA(s)}</span>
+            <ColumnHeader label='PA' tooltip='Points Against — total points allowed' />
+            <span className={`font-medium tabular-nums text-xs sm:text-sm ${paColor}`}>{getPA(s)}</span>
           </div>
           <div className='flex flex-col items-center gap-0.5'>
-            <span className='text-xs text-gray-400'>PA/G</span>
+            <ColumnHeader label='PA/G' tooltip='Points Against per game' />
             <span className='text-gray-100 font-medium tabular-nums text-xs sm:text-sm'>{getPAG(s)}</span>
           </div>
           <div className='flex flex-col items-center gap-0.5'>
-            <span className='text-xs text-gray-400'>Diff</span>
+            <ColumnHeader label='Diff' tooltip='Point differential (PF − PA)' />
             <span className={`font-medium tabular-nums text-xs sm:text-sm ${diffColor}`}>{diffStr}</span>
           </div>
           <div className='flex flex-col items-center gap-0.5'>
-            <span className='text-xs text-gray-400'>MaxPF</span>
+            <ColumnHeader label='MaxPF' tooltip='Maximum Points For — best possible lineup each week' />
             <span className='text-gray-100 font-medium tabular-nums text-xs sm:text-sm'>{getMaxPF(s)}</span>
           </div>
           <div className='flex flex-col items-center gap-0.5'>
-            <span className='text-xs text-gray-400'>Eff%</span>
-            <span className='text-gray-100 font-medium tabular-nums text-xs sm:text-sm'>{getEff(s)}</span>
+            <ColumnHeader label='Eff%' tooltip='Lineup efficiency (PF ÷ MaxPF)' />
+            <span className={`font-medium tabular-nums text-xs sm:text-sm ${effColor}`}>{getEff(s)}</span>
           </div>
           <div className='flex flex-col items-center gap-0.5'>
-            <span className='text-xs text-gray-400'>FAAB</span>
+            <ColumnHeader label='FAAB' tooltip='Waiver budget used' />
             <span className='text-gray-300 text-xs sm:text-sm tabular-nums'>${s.waiver_budget_used ?? '—'}</span>
           </div>
           <div className='flex flex-col items-center gap-0.5'>
-            <span className='text-xs text-gray-400'>Waiv</span>
+            <ColumnHeader label='Waiv' tooltip='Waiver priority' />
             <span className='text-gray-300 text-xs sm:text-sm tabular-nums'>{s.waiver_position ?? '—'}</span>
           </div>
         </div>
