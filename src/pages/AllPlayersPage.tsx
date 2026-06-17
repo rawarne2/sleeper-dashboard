@@ -10,8 +10,8 @@ import type { KtcConfig, Player } from '../types';
 import { API_CONFIG, buildApiUrl } from '../apiConfig';
 import { useLeague } from '../useLeague';
 import { mapBackendPlayerRow, ktcDisplayValues } from '../playerFunctions';
-import { ktcConfigParams } from '../utils/leagueConfig';
-import { POSITION_ORDER, positionColorVar } from '../utils/valueDisplay';
+import { ktcConfigParams, availablePositions } from '../utils/leagueConfig';
+import { positionColorVar } from '../utils/valueDisplay';
 import { type SortDirection } from '../components/playerTable/ColumnHeader';
 import { PlayerStatHeader, type StatSortKey } from '../components/playerTable/PlayerStatHeader';
 import { PlayerStatRow } from '../components/playerTable/PlayerStatRow';
@@ -54,7 +54,7 @@ const PostureToggle = ({
 );
 
 export default function AllPlayersPage() {
-  const { ktcConfig, playerOwnership, bundleSeason } = useLeague();
+  const { ktcConfig, playerOwnership, bundleSeason, league } = useLeague();
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const togglePlayer = (id: string) => setExpandedPlayer((c) => (c === id ? null : id));
 
@@ -72,6 +72,9 @@ export default function AllPlayersPage() {
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query);
   const [position, setPosition] = useState<'ALL' | string>('ALL');
+  useEffect(() => {
+    if (position !== 'ALL' && !availablePositions(league).includes(position)) setPosition('ALL');
+  }, [league, position]);
   const [sortKey, setSortKey] = useState<StatSortKey>('consensus');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
@@ -240,7 +243,7 @@ export default function AllPlayersPage() {
         />
 
         <div className='flex flex-wrap justify-center gap-1.5'>
-          {(['ALL', ...POSITION_ORDER] as const).map((pos) => {
+          {(['ALL', ...availablePositions(league)]).map((pos) => {
             const active = position === pos;
             return (
               <button

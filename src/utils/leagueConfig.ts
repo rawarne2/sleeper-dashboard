@@ -60,6 +60,22 @@ export function ktcConfigEquals(a: KtcConfig, b: KtcConfig): boolean {
   );
 }
 
+const FLEX_SLOTS = new Set(['FLEX','SUPER_FLEX','REC_FLEX','WRRB_FLEX','WRRB_WRT','IDP_FLEX']);
+const FLEX_COVERS = ['RB','WR','TE'];
+
+/** Position filter chips the league actually starts, in canonical order. */
+export function availablePositions(league: { roster_positions?: string[] } | null | undefined): string[] {
+  const rp = league?.roster_positions;
+  if (!Array.isArray(rp) || rp.length === 0) return ['QB','RB','WR','TE','K','DEF'];
+  const slots = new Set(rp);
+  const hasFlex = rp.some((s) => FLEX_SLOTS.has(s));
+  const show = (p: string) =>
+    slots.has(p) ||
+    (p === 'QB' && slots.has('SUPER_FLEX')) ||
+    (hasFlex && FLEX_COVERS.includes(p));
+  return ['QB','RB','WR','TE','K','DEF'].filter(show);
+}
+
 /** Query params for the dashboard / players-all endpoints. */
 export function ktcConfigParams(config: KtcConfig): Record<string, string> {
   return {
