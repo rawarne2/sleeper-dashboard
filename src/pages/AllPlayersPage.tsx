@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -15,6 +16,7 @@ import { type SortDirection } from '../components/playerTable/ColumnHeader';
 import { PlayerStatHeader, type StatSortKey } from '../components/playerTable/PlayerStatHeader';
 import { PlayerStatRow } from '../components/playerTable/PlayerStatRow';
 import { statColumnCount } from '../components/playerTable/layout';
+import { PlayerDetailContent } from '../components/PlayerDetailContent';
 
 interface Row {
   player: Player;
@@ -53,6 +55,8 @@ const PostureToggle = ({
 
 export default function AllPlayersPage() {
   const { ktcConfig, playerOwnership, bundleSeason } = useLeague();
+  const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
+  const togglePlayer = (id: string) => setExpandedPlayer((c) => (c === id ? null : id));
 
   // Seed from the league's resolved KTC identity; the toggles below allow local
   // overrides. Switching leagues re-syncs to the new league's identity.
@@ -275,14 +279,24 @@ export default function AllPlayersPage() {
             />
             <tbody>
               {visible.map((r, i) => (
-                <PlayerStatRow
-                  key={r.player.player_id ?? i}
-                  player={r.player}
-                  variant='all-players'
-                  index={i}
-                  showRedraft={config.is_redraft}
-                  ownershipMap={playerOwnership}
-                />
+                <Fragment key={r.player.player_id ?? i}>
+                  <PlayerStatRow player={r.player} variant='all-players' index={i}
+                    showRedraft={config.is_redraft} ownershipMap={playerOwnership}
+                    expanded={expandedPlayer === r.player.player_id} onClick={togglePlayer} />
+                  {expandedPlayer === r.player.player_id && (
+                    <tr>
+                      <td colSpan={statColumnCount('all-players', config.is_redraft)} className='p-0 align-top'>
+                        <div className='player-detail-row w-full'>
+                          <div className='sticky left-0 w-[min(100vw,72rem)] max-w-full'>
+                            <PlayerDetailContent player={r.player} bundleSeason={bundleSeason}
+                              leagueSeason={bundleSeason} researchWeek={r.player.research_latest?.week ?? null}
+                              ownershipMap={playerOwnership} compact />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
               {visible.length === 0 && (
                 <tr>

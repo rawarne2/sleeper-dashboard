@@ -141,18 +141,16 @@ export const PlayerStatRow = memo((props: PlayerStatRowProps) => {
 
   if (variant === 'all-players') {
     return (
-      <tr className='group border-b border-white/5 hover:bg-white/[0.04]'>
-        <td className={`${cellPad} text-right align-middle`}>
-          <NumCell tone='muted'>{(index ?? 0) + 1}</NumCell>
-        </td>
+      <tr className='group cursor-pointer border-b border-white/5 hover:bg-white/[0.04]'
+          onClick={() => player.player_id && onClick?.(player.player_id)}>
+        <td className={`${cellPad} text-right align-middle`}><NumCell tone='muted'>{(index ?? 0) + 1}</NumCell></td>
         {playerCell}
-        <Cell>
-          <NumCell tone='muted'>{player.team || '—'}</NumCell>
-        </Cell>
-        {ownStartCells}
-        {seasonCells}
-        {projCells}
-        {valueRunCells}
+        <Cell><NumCell tone='muted'>{player.team || '—'}</NumCell></Cell>
+        {ownStartCells}{seasonCells}{projCells}{valueRunCells}
+        <td className='w-7 px-1 align-middle text-center'>
+          {expanded ? <ChevronUpIcon className='inline h-5 w-5 text-ink-mid' />
+                    : <ChevronDownIcon className='inline h-5 w-5 text-ink-mid' />}
+        </td>
       </tr>
     );
   }

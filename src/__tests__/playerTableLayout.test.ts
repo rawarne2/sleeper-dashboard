@@ -6,8 +6,8 @@ describe('statColumnCount', () => {
     expect(statColumnCount('standings', false)).toBe(19);
     expect(statColumnCount('standings', true)).toBe(20);
   });
-  it('all-players without redraft = 20, with redraft = 21', () => {
-    expect(statColumnCount('all-players', false)).toBe(20);
-    expect(statColumnCount('all-players', true)).toBe(21);
+  it('all-players without redraft = 21, with redraft = 22', () => {
+    expect(statColumnCount('all-players', false)).toBe(21);
+    expect(statColumnCount('all-players', true)).toBe(22);
   });
 });

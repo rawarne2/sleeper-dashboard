@@ -124,7 +124,7 @@ export function PlayerStatHeader({ variant, showRedraft, sort }: PlayerStatHeade
           </th>
         )}
         {groupRow}
-        {variant === 'standings' && <th rowSpan={2} className='w-7' aria-hidden />}
+        <th rowSpan={2} className='w-7' aria-hidden />
       </tr>
       <tr className='border-b border-line'>{leafRow}</tr>
     </thead>
