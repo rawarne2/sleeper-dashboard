@@ -6,7 +6,7 @@ import React, {
   useRef,
   ReactNode,
 } from 'react';
-import { openDB } from 'idb';
+import { initDB } from './db';
 import {
   Roster,
   User,
@@ -16,7 +16,6 @@ import {
   ResearchMeta,
   TeamData,
   LeagueContextType,
-  PlayerDBSchema,
   DashboardLeagueBundle,
   TradeAnalyzerPick,
   KtcConfig,
@@ -39,9 +38,6 @@ import {
   ktcConfigParams,
   resolveLeagueKtcConfig,
 } from './utils/leagueConfig';
-
-const DB_NAME = 'sleeper-players-db';
-const DB_VERSION = 4;
 
 /**
  * Polls the KTC refresh job status endpoint until terminal state.
@@ -104,33 +100,6 @@ export const LeagueProvider: React.FC<LeagueProviderProps> = ({ children }) => {
   // Mirror the ref as state so consumers (All Players, Trade Analyzer) can read the resolved config.
   const [ktcConfig, setKtcConfig] = useState<KtcConfig>(FALLBACK_KTC_CONFIG);
 
-  const initDB = useCallback(async () => {
-    return openDB<PlayerDBSchema>(DB_NAME, DB_VERSION, {
-      upgrade(db, oldVersion) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rawDb = db as any;
-        if (oldVersion < 1) {
-          rawDb.createObjectStore('players', { keyPath: 'player_id' });
-          rawDb.createObjectStore('metadata', { keyPath: 'key' });
-          rawDb.createObjectStore('ownership', { keyPath: 'key' });
-        }
-        if (oldVersion < 2) {
-          db.createObjectStore('app_prefs', { keyPath: 'key' });
-        }
-        if (oldVersion < 3) {
-          db.createObjectStore('bundle_cache', { keyPath: 'key' });
-        }
-        if (oldVersion < 4) {
-          // Remove write-only stores superseded by bundle_cache
-          for (const name of ['players', 'metadata', 'ownership']) {
-            if (rawDb.objectStoreNames.contains(name)) {
-              rawDb.deleteObjectStore(name);
-            }
-          }
-        }
-      },
-    });
-  }, []);
 
   useEffect(() => {
     let cancelled = false;

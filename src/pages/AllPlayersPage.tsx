@@ -11,6 +11,7 @@ import { API_CONFIG, buildApiUrl } from '../apiConfig';
 import { useLeague } from '../useLeague';
 import { mapBackendPlayerRow, ktcDisplayValues } from '../playerFunctions';
 import { ktcConfigParams, availablePositions } from '../utils/leagueConfig';
+import { playersAllCacheKey, readPlayersAllCache, writePlayersAllCache } from '../playersAllCache';
 import { positionColorVar } from '../utils/valueDisplay';
 import { type SortDirection } from '../components/playerTable/ColumnHeader';
 import { PlayerStatHeader, type StatSortKey } from '../components/playerTable/PlayerStatHeader';
@@ -54,7 +55,7 @@ const PostureToggle = ({
 );
 
 export default function AllPlayersPage() {
-  const { ktcConfig, playerOwnership, bundleSeason, league } = useLeague();
+  const { ktcConfig, playerOwnership, bundleSeason, league, selectedLeagueId } = useLeague();
   const [expandedPlayer, setExpandedPlayer] = useState<string | null>(null);
   const togglePlayer = (id: string) => setExpandedPlayer((c) => (c === id ? null : id));
 
@@ -86,7 +87,17 @@ export default function AllPlayersPage() {
       ...ktcConfigParams(config),
       ...(bundleSeason ? { season: bundleSeason } : {}),
     });
+    const cacheKey = playersAllCacheKey(selectedLeagueId || null, config, bundleSeason ?? null);
     (async () => {
+      const cached = await readPlayersAllCache(cacheKey);
+      if (cached?.players?.length) {
+        setPlayers(
+          cached.players
+            .map((p) => mapBackendPlayerRow(p as Parameters<typeof mapBackendPlayerRow>[0]))
+            .filter((p): p is Player => p != null)
+        );
+        setLoading(false); // paint immediately; still revalidate below
+      }
       try {
         const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) throw new Error(`Failed to load players: ${res.status}`);
@@ -99,23 +110,27 @@ export default function AllPlayersPage() {
           : Array.isArray(body.data?.players)
             ? body.data.players
             : [];
-        const mapped = list
-          .map((p) => mapBackendPlayerRow(p as Parameters<typeof mapBackendPlayerRow>[0]))
-          .filter((p): p is Player => p != null);
-        setPlayers(mapped);
+        setPlayers(
+          list
+            .map((p) => mapBackendPlayerRow(p as Parameters<typeof mapBackendPlayerRow>[0]))
+            .filter((p): p is Player => p != null)
+        );
         setLoading(false);
+        void writePlayersAllCache(cacheKey, list, Date.now());
       } catch (e) {
         if ((e as Error).name === 'AbortError') return;
-        setError(
-          (e as Error).message ||
-            'Unable to load players. Ensure the backend server is running.'
-        );
-        setPlayers([]);
+        if (!cached) {
+          setError(
+            (e as Error).message ||
+              'Unable to load players. Ensure the backend server is running.'
+          );
+          setPlayers([]);
+        }
         setLoading(false);
       }
     })();
     return () => controller.abort();
-  }, [config, bundleSeason]);
+  }, [config, bundleSeason, selectedLeagueId]);
 
   const rows = useMemo<Row[]>(() => {
     return players.map((player) => {

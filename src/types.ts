@@ -386,6 +386,12 @@ export interface BundleCacheRow {
     data: DashboardLeagueBundle;
 }
 
+/** IndexedDB row for `players_all_cache` (stale-while-revalidate for /players/all). */
+export interface PlayersAllCacheRow {
+    players: unknown[];
+    cachedAt: number;
+}
+
 // ============================================================================
 // Research Data Types
 // ============================================================================
@@ -524,6 +530,10 @@ export interface PlayerDBSchema extends DBSchema {
     bundle_cache: {
         key: string;
         value: BundleCacheRow;
+    };
+    players_all_cache: {
+        key: string;
+        value: PlayersAllCacheRow;
     };
 }
 
