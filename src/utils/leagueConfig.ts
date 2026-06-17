@@ -10,6 +10,19 @@ export const FALLBACK_KTC_CONFIG: KtcConfig = {
 const SUPERFLEX_SLOTS = new Set(['SUPER_FLEX', 'SFLEX', 'QB/WR/RB/TE']);
 
 /**
+ * Map a league's `bonus_rec_te` to the nearest KTC TE-premium bucket
+ * (0→'', 0.5→tep, 1.0→tepp, 1.5→teppp). Bucket edges sit at 0.25 / 0.75 / 1.25,
+ * and anything at or above 1.25 clamps to the highest bucket.
+ */
+export function resolveTepLevel(bonusRecTe: number | null | undefined): KtcConfig['tep_level'] {
+  const b = typeof bonusRecTe === 'number' ? bonusRecTe : 0;
+  if (b < 0.25) return '';
+  if (b < 0.75) return 'tep';
+  if (b < 1.25) return 'tepp';
+  return 'teppp';
+}
+
+/**
  * Best-effort detection of a league's KTC query identity from its Sleeper
  * settings. Each field falls back independently to FALLBACK_KTC_CONFIG so a
  * partially-populated league still yields a sensible config.
@@ -17,7 +30,7 @@ const SUPERFLEX_SLOTS = new Set(['SUPER_FLEX', 'SFLEX', 'QB/WR/RB/TE']);
  * - format: superflex if the roster has a SUPER_FLEX slot or 2+ QB slots.
  * - dynasty/redraft: Sleeper `type` 2=dynasty, 1=keeper, 0=redraft; a taxi
  *   squad implies dynasty. Defaults to dynasty.
- * - TE premium: from `bonus_rec_te` (0.5→tep, 1.0→tepp, 1.5+→teppp).
+ * - TE premium: `bonus_rec_te` rounded to the nearest KTC bucket via resolveTepLevel.
  */
 export function resolveLeagueKtcConfig(
   league: League | null | undefined,
@@ -40,14 +53,11 @@ export function resolveLeagueKtcConfig(
     is_redraft = ls.type === 0 && taxi === 0;
   }
 
-  let tep_level: KtcConfig['tep_level'];
   const bte = league.scoring_settings?.bonus_rec_te;
-  if (typeof bte === 'number') {
-    tep_level = bte >= 1.5 ? 'teppp' : bte >= 1.0 ? 'tepp' : bte >= 0.25 ? 'tep' : '';
-  } else {
-    // Unknown scoring → assume the common TE-premium default.
-    tep_level = FALLBACK_KTC_CONFIG.tep_level;
-  }
+  // Unknown scoring → assume the common TE-premium default; otherwise round to the
+  // nearest KTC bucket.
+  const tep_level: KtcConfig['tep_level'] =
+    typeof bte === 'number' ? resolveTepLevel(bte) : FALLBACK_KTC_CONFIG.tep_level;
 
   return { league_format, is_redraft, tep_level };
 }

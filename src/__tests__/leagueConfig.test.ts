@@ -1,6 +1,6 @@
 // src/__tests__/leagueConfig.test.ts
 import { describe, it, expect } from 'vitest';
-import { resolveLeagueKtcConfig, FALLBACK_KTC_CONFIG } from '../utils/leagueConfig';
+import { resolveLeagueKtcConfig, resolveTepLevel, FALLBACK_KTC_CONFIG } from '../utils/leagueConfig';
 import type { League } from '../types';
 
 const league = (over: Partial<League>): League => ({
@@ -57,5 +57,21 @@ describe('resolveLeagueKtcConfig', () => {
     expect(
       resolveLeagueKtcConfig(league({ league_settings: { type: 1, taxi_slots: 2 } })).is_redraft
     ).toBe(false);
+  });
+});
+
+describe('resolveTepLevel', () => {
+  it('rounds bonus_rec_te to the nearest KTC bucket', () => {
+    expect(resolveTepLevel(0)).toBe('');
+    expect(resolveTepLevel(0.5)).toBe('tep');
+    expect(resolveTepLevel(0.75)).toBe('tepp');    // 0.75 is the tep/tepp edge → tepp
+    expect(resolveTepLevel(0.8)).toBe('tepp');     // nearest 1.0
+    expect(resolveTepLevel(1.33)).toBe('teppp');   // ≥1.25 edge → teppp
+    expect(resolveTepLevel(2.0)).toBe('teppp');    // clamps to highest bucket
+  });
+
+  it('treats null/undefined as no TE premium', () => {
+    expect(resolveTepLevel(null)).toBe('');
+    expect(resolveTepLevel(undefined)).toBe('');
   });
 });
