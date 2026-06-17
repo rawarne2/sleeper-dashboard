@@ -1,7 +1,6 @@
 import { type ReactNode } from 'react';
 import { ValuesBlock } from '../../types';
-import { formatValue, trendInfo } from '../../utils/valueDisplay';
-import { SourceChip } from '../SourceChip';
+import { formatValue, sourceMeta, trendInfo } from '../../utils/valueDisplay';
 
 /** Consensus (KTC+FC blend) hero number — its own column (trend is separate now). */
 export function ConsensusCell({ values }: { values?: ValuesBlock | null }) {
@@ -13,7 +12,7 @@ export function ConsensusCell({ values }: { values?: ValuesBlock | null }) {
   );
 }
 
-/** Single source value (KTC or FantasyCalc) in that source's color identity — its own column. */
+/** Source trade value — label lives in the column header; cell shows the figure only. */
 export function SourceValueCell({
   sourceKey,
   value,
@@ -21,7 +20,16 @@ export function SourceValueCell({
   sourceKey: 'ktc' | 'fantasycalc';
   value?: number | null;
 }) {
-  return <SourceChip sourceKey={sourceKey} value={value ?? null} />;
+  const meta = sourceMeta(sourceKey);
+  const formatted = formatValue(value);
+  return (
+    <span
+      className={`num text-sm font-medium leading-none ${meta?.textClass ?? 'text-ink'}`}
+      title={`${meta?.fullLabel ?? sourceKey}: ${formatted}`}
+    >
+      {formatted}
+    </span>
+  );
 }
 
 /** 30-day trend cell: colored arrow + magnitude (shared by the All Players grid). */

@@ -1,6 +1,13 @@
 // src/__tests__/leagueConfig.test.ts
 import { describe, it, expect } from 'vitest';
-import { resolveLeagueKtcConfig, resolveTepLevel, FALLBACK_KTC_CONFIG } from '../utils/leagueConfig';
+import {
+  resolveLeagueKtcConfig,
+  resolveTepLevel,
+  FALLBACK_KTC_CONFIG,
+  formatLeagueFormatLabel,
+  formatLeagueTypeLabel,
+  formatTepLevelLabel,
+} from '../utils/leagueConfig';
 import type { League } from '../types';
 
 const league = (over: Partial<League>): League => ({
@@ -73,5 +80,26 @@ describe('resolveTepLevel', () => {
   it('treats null/undefined as no TE premium', () => {
     expect(resolveTepLevel(null)).toBe('');
     expect(resolveTepLevel(undefined)).toBe('');
+  });
+});
+
+describe('formatKtcConfigLabels', () => {
+  it('formats league format, type, and TE premium for display', () => {
+    expect(formatLeagueFormatLabel('1qb')).toBe('1QB');
+    expect(formatLeagueFormatLabel('superflex')).toBe('Superflex');
+    expect(formatTepLevelLabel('')).toBe('No TEP');
+    expect(formatTepLevelLabel('tepp')).toBe('TEPP');
+    expect(
+      formatLeagueTypeLabel(
+        league({ league_settings: { type: 1, taxi_slots: 2 } }),
+        { league_format: 'superflex', is_redraft: false, tep_level: 'tep' }
+      )
+    ).toBe('Keeper');
+    expect(
+      formatLeagueTypeLabel(
+        league({ league_settings: { type: 0, taxi_slots: 0 } }),
+        { league_format: '1qb', is_redraft: true, tep_level: '' }
+      )
+    ).toBe('Redraft');
   });
 });

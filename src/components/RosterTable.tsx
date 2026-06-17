@@ -3,7 +3,7 @@ import { Player } from '../types';
 import { PlayerDetailContent } from './PlayerDetailContent';
 import { PlayerStatRow } from './playerTable/PlayerStatRow';
 import { PlayerStatHeader } from './playerTable/PlayerStatHeader';
-import { statColumnCount } from './playerTable/layout';
+import { statColumnCount, PLAYER_ROSTER_SCROLL } from './playerTable/layout';
 
 export type OwnershipMap = Record<string, { owned: number; started?: number }>;
 
@@ -131,7 +131,7 @@ export const RosterTable = memo(
       ));
 
     return (
-      <div className='overflow-x-auto rounded-md border border-line-soft bg-surface-raised'>
+      <div className={PLAYER_ROSTER_SCROLL}>
         <table className='min-w-full border-collapse'>
           <PlayerStatHeader variant='standings' showRedraft={showRedraft} />
           <tbody>

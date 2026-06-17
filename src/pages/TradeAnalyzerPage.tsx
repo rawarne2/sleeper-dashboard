@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
-  BarChart3Icon,
   ChevronDownIcon,
   ChevronUpIcon,
   RefreshCwIcon,
@@ -58,6 +57,7 @@ import {
   tradeAnalyzerSeasonWire,
 } from './tradeAnalyzer/helpers';
 import { SideCard } from './tradeAnalyzer/SideCard';
+import { DashboardSectionMeta } from '../components/DashboardSectionMeta';
 
 export const TradeAnalyzerPage: React.FC = () => {
   const {
@@ -480,17 +480,16 @@ export const TradeAnalyzerPage: React.FC = () => {
   };
 
   return (
-    <div className='w-full'>
+    <div className='mx-auto w-full max-w-6xl px-2 sm:px-4'>
+      <div className='league-standings-heading mb-2 text-center text-lg font-semibold text-primary-main sm:text-2xl'>
+        Trade Analyzer
+      </div>
+      <DashboardSectionMeta showScoring className='mb-4' />
+
       <div ref={builderRef} className='rounded-xl border border-white/10 bg-[#0d1e2e] p-3 sm:p-4'>
         <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
           <div>
-            <div className='flex items-center gap-2'>
-              <BarChart3Icon className='h-5 w-5 text-primary-main' />
-              <div className='text-base sm:text-lg font-semibold text-gray-100'>
-                Trade Analyzer
-              </div>
-            </div>
-            <p className='mt-2 text-xs sm:text-sm text-gray-300'>
+            <p className='text-xs sm:text-sm text-gray-300'>
               <span className='font-semibold text-gray-200'>AI service: </span>
               <span>{aiRouting.serviceLabel}</span>
               <span className='mx-2 text-gray-500' aria-hidden>

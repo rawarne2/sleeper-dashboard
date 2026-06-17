@@ -1,7 +1,20 @@
 import { ColumnHeader, type SortDirection } from './ColumnHeader';
 import { LeafTh, GroupTh, cellPad, COL_A, GROUP_EDGE } from './layout';
 
-export type StatSortKey = 'consensus' | 'trend' | 'redraft' | 'vol' | 'liq' | 'rank' | 'tier' | 'own';
+export type StatSortKey =
+  | 'consensus'
+  | 'trend'
+  | 'ktc'
+  | 'fc'
+  | 'redraft'
+  | 'vol'
+  | 'liq'
+  | 'rank'
+  | 'tier'
+  | 'own';
+
+export const DEFAULT_STAT_SORT_KEY: StatSortKey = 'consensus';
+export const DEFAULT_STAT_SORT_DIR = 'desc' as const;
 
 interface StatSort {
   dirFor: (k: StatSortKey) => SortDirection;
@@ -77,24 +90,29 @@ export function PlayerStatHeader({ variant, showRedraft, sort }: PlayerStatHeade
       <LeafTh label='ROS' tip='Rest-of-season projected fantasy points' edge />
       <LeafTh label='Wk' tip="Next week's projected fantasy points" tint />
       <ValTh label='Consensus' tip='Consensus — average of KTC and FantasyCalc.' k='consensus' edge sort={sort} />
-      <ValTh label='30 Day' tip='FantasyCalc 30-day value trend (arrow + change).' k='trend' tint sort={sort} />
-      <ValTh sort={sort} label='KTC' tip='KeepTradeCut trade value' />
-      <ValTh sort={sort} label='FC' tip="FantasyCalc trade value (this league's PPR / team count)." tint />
+      <ValTh label='30 Day' tip='FantasyCalc 30-day value trend (arrow + change).' k='trend' sort={sort} />
+      <ValTh sort={sort} label='KTC' tip='KeepTradeCut trade value' k='ktc' tint />
+      <ValTh
+        sort={sort}
+        label='FC'
+        tip="FantasyCalc trade value (this league's PPR / team count)."
+        k='fc'
+      />
       {showRedraft && (
-        <ValTh sort={sort} label='Redraft' tip='FantasyCalc redraft (win-now) value' k='redraft' />
+        <ValTh sort={sort} label='Redraft' tip='FantasyCalc redraft (win-now) value' k='redraft' tint />
       )}
       <ValTh
         sort={sort}
         label='Vol'
         tip='FantasyCalc value volatility — higher means a less settled price'
         k='vol'
-        tint
       />
       <ValTh
         sort={sort}
         label='Liq'
         tip='Trade liquidity — how frequently this player is traded'
         k='liq'
+        tint
       />
       <ValTh sort={sort} label='Pos' tip='KTC positional rank' edge />
       <ValTh sort={sort} label='Ovr' tip='KTC overall rank' k='rank' defaultDir='asc' tint />
@@ -104,7 +122,7 @@ export function PlayerStatHeader({ variant, showRedraft, sort }: PlayerStatHeade
   );
 
   return (
-    <thead className='sticky top-0 z-20 bg-surface-header'>
+    <thead className='sticky top-0 z-20 bg-surface-header shadow-[0_1px_0_var(--color-line-soft)]'>
       <tr className='border-b border-line-soft'>
         {variant === 'all-players' && (
           <th rowSpan={2} className={`${cellPad} text-right`} scope='col'>

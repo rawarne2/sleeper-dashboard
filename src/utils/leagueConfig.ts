@@ -86,6 +86,28 @@ export function availablePositions(league: { roster_positions?: string[] } | nul
   return ['QB','RB','WR','TE','K','DEF'].filter(show);
 }
 
+export function formatLeagueFormatLabel(format: KtcConfig['league_format']): string {
+  return format === '1qb' ? '1QB' : 'Superflex';
+}
+
+export function formatLeagueTypeLabel(
+  league: League | null | undefined,
+  config: KtcConfig
+): string {
+  const ls = league?.league_settings;
+  if (ls && typeof ls.type === 'number') {
+    if (ls.type === 0 && config.is_redraft) return 'Redraft';
+    if (ls.type === 1) return 'Keeper';
+    if (ls.type === 2) return 'Dynasty';
+  }
+  return config.is_redraft ? 'Redraft' : 'Dynasty';
+}
+
+export function formatTepLevelLabel(tep: KtcConfig['tep_level']): string {
+  if (!tep) return 'No TEP';
+  return tep.toUpperCase();
+}
+
 /** Query params for the dashboard / players-all endpoints. */
 export function ktcConfigParams(config: KtcConfig): Record<string, string> {
   return {

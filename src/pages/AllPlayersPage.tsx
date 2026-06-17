@@ -14,15 +14,23 @@ import { ktcConfigParams, availablePositions } from '../utils/leagueConfig';
 import { playersAllCacheKey, readPlayersAllCache, writePlayersAllCache } from '../playersAllCache';
 import { positionColorVar } from '../utils/valueDisplay';
 import { type SortDirection } from '../components/playerTable/ColumnHeader';
-import { PlayerStatHeader, type StatSortKey } from '../components/playerTable/PlayerStatHeader';
+import {
+  PlayerStatHeader,
+  DEFAULT_STAT_SORT_DIR,
+  DEFAULT_STAT_SORT_KEY,
+  type StatSortKey,
+} from '../components/playerTable/PlayerStatHeader';
 import { PlayerStatRow } from '../components/playerTable/PlayerStatRow';
-import { statColumnCount } from '../components/playerTable/layout';
+import { statColumnCount, PLAYER_LIST_SCROLL } from '../components/playerTable/layout';
 import { PlayerDetailContent } from '../components/PlayerDetailContent';
+import { DashboardSectionMeta } from '../components/DashboardSectionMeta';
 
 interface Row {
   player: Player;
   consensus: number | null;
   trend: number | null;
+  ktc: number | null;
+  fc: number | null;
   redraft: number | null;
   vol: number | null;
   liq: number | null;
@@ -76,8 +84,8 @@ export default function AllPlayersPage() {
   useEffect(() => {
     if (position !== 'ALL' && !availablePositions(league).includes(position)) setPosition('ALL');
   }, [league, position]);
-  const [sortKey, setSortKey] = useState<StatSortKey>('consensus');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [sortKey, setSortKey] = useState<StatSortKey>(DEFAULT_STAT_SORT_KEY);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(DEFAULT_STAT_SORT_DIR);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -143,6 +151,8 @@ export default function AllPlayersPage() {
         player,
         consensus: v?.blended ?? null,
         trend: fc?.trend_30day ?? null,
+        ktc: v?.sources?.ktc?.value ?? null,
+        fc: fc?.value ?? null,
         redraft: fc?.redraft_value ?? null,
         vol: fc?.volatility ?? null,
         liq: fc?.trade_frequency ?? null,
@@ -169,7 +179,12 @@ export default function AllPlayersPage() {
     const dir = sortDir === 'asc' ? 1 : -1;
     const get = (r: Row): number | null => {
       switch (sortKey) {
-        case 'trend': return r.trend;
+        case 'trend':
+          return r.trend;
+        case 'ktc':
+          return r.ktc;
+        case 'fc':
+          return r.fc;
         case 'redraft':
           return r.redraft;
         case 'vol':
@@ -197,16 +212,23 @@ export default function AllPlayersPage() {
     });
   }, [rows, deferredQuery, position, sortKey, sortDir]);
 
-  const onSort = useCallback((key: StatSortKey, defaultDir: 'asc' | 'desc') => {
-    setSortKey((prev) => {
-      if (prev === key) {
-        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-        return prev;
+  const onSort = useCallback(
+    (key: StatSortKey, defaultDir: 'asc' | 'desc') => {
+      if (sortKey !== key) {
+        setSortKey(key);
+        setSortDir(defaultDir);
+        return;
       }
-      setSortDir(defaultDir);
-      return key;
-    });
-  }, []);
+      const opposite = defaultDir === 'desc' ? 'asc' : 'desc';
+      if (sortDir === defaultDir) {
+        setSortDir(opposite);
+      } else {
+        setSortKey(DEFAULT_STAT_SORT_KEY);
+        setSortDir(DEFAULT_STAT_SORT_DIR);
+      }
+    },
+    [sortKey, sortDir]
+  );
 
   const dirFor = (key: StatSortKey): SortDirection => (sortKey === key ? sortDir : null);
 
@@ -215,6 +237,8 @@ export default function AllPlayersPage() {
       <div className='hd mb-3 text-center text-lg font-semibold text-primary-main sm:text-2xl'>
         All Players
       </div>
+
+      <DashboardSectionMeta showScoring={false} className='mb-3' />
 
       {/* Controls */}
       <div className='mb-3 flex flex-col gap-2'>
@@ -292,7 +316,7 @@ export default function AllPlayersPage() {
       ) : loading ? (
         <div className='px-4 py-10 text-center text-sm text-ink-mid'>Loading players…</div>
       ) : (
-        <div className='overflow-x-auto rounded-md border border-line-soft bg-surface-raised'>
+        <div className={PLAYER_LIST_SCROLL}>
           <table className='min-w-full border-collapse'>
             <PlayerStatHeader
               variant='all-players'

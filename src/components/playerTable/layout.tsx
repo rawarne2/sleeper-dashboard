@@ -60,6 +60,18 @@ export function statColumnCount(
   return 1 + 1 + 1 + common + 1;            // # + Player + Team + common + expand
 }
 
+/** Shared scroll shell for player tables with a sticky header inside the panel. */
+const PLAYER_TABLE_SCROLL_SHELL =
+  'overflow-auto rounded-md border border-line-soft bg-surface-raised';
+
+/** League Standings expanded roster — keeps sticky header scoped to one team. */
+export const PLAYER_ROSTER_SCROLL =
+  `${PLAYER_TABLE_SCROLL_SHELL} max-h-[min(70dvh,42rem)]`;
+
+/** All Players grid — taller panel below tab bar and filter controls. */
+export const PLAYER_LIST_SCROLL =
+  `${PLAYER_TABLE_SCROLL_SHELL} max-h-[calc(100dvh-var(--dashboard-tab-bar-height)-11rem)]`;
+
 /** Grouped (colgroup) header spanning several leaf columns. */
 export const GroupTh = ({
   label,

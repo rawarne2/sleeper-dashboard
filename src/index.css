@@ -212,6 +212,9 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Sticky player-table header offset (dashboard tab bar). */
+  --dashboard-tab-bar-height: 3.25rem;
 }
 
 a {
