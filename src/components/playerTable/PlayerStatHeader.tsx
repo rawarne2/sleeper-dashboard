@@ -79,7 +79,7 @@ export function PlayerStatHeader({ variant, showRedraft, sort }: PlayerStatHeade
       <ValTh label='Consensus' tip='Consensus — average of KTC and FantasyCalc.' k='consensus' edge sort={sort} />
       <ValTh label='30d' tip='FantasyCalc 30-day value trend (arrow + change).' k='trend' tint sort={sort} />
       <ValTh sort={sort} label='KTC' tip='KeepTradeCut trade value' />
-      <ValTh sort={sort} label='FC' tip='FantasyCalc trade value' tint />
+      <ValTh sort={sort} label='FC' tip="FantasyCalc trade value (this league's PPR / team count)." tint />
       {showRedraft && (
         <ValTh sort={sort} label='Redraft' tip='FantasyCalc redraft (win-now) value' k='redraft' />
       )}
