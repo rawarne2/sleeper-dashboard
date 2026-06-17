@@ -48,13 +48,19 @@ const Dashboard: React.FC = () => {
       ? 'standings'
       : normalizeDashboardHash(window.location.hash)
   ]));
-  useEffect(() => {
-    setVisited((c) => (c.has(activeTab) ? c : new Set(c).add(activeTab)));
-  }, [activeTab]);
+  // Mark a tab visited (so it stays mounted) and activate it. Updating `visited`
+  // here — in event/callback paths rather than a standalone effect — avoids the
+  // synchronous-setState-in-effect cascade lint and keeps state preserved across switches.
+  const selectTab = (tab: DashboardTab) => {
+    setActiveTab(tab);
+    setVisited((c) => (c.has(tab) ? c : new Set(c).add(tab)));
+  };
 
   useEffect(() => {
     const onHashChange = () => {
-      setActiveTab(normalizeDashboardHash(window.location.hash));
+      const next = normalizeDashboardHash(window.location.hash);
+      setActiveTab(next);
+      setVisited((c) => (c.has(next) ? c : new Set(c).add(next)));
     };
     window.addEventListener('hashchange', onHashChange);
     onHashChange();
@@ -91,7 +97,7 @@ const Dashboard: React.FC = () => {
               className={`${baseBtn} flex-1 ${
                 activeTab === 'standings' ? tabActive : tabInactive
               }`}
-              onClick={() => setActiveTab('standings')}
+              onClick={() => selectTab('standings')}
             >
               League Standings
             </button>
@@ -102,7 +108,7 @@ const Dashboard: React.FC = () => {
               className={`${baseBtn} flex-1 ${
                 activeTab === 'all-players' ? tabActive : tabInactive
               }`}
-              onClick={() => setActiveTab('all-players')}
+              onClick={() => selectTab('all-players')}
             >
               All Players
             </button>
@@ -113,7 +119,7 @@ const Dashboard: React.FC = () => {
               className={`${baseBtn} flex-1 ${
                 activeTab === 'trade-analyzer' ? tabActive : tabInactive
               }`}
-              onClick={() => setActiveTab('trade-analyzer')}
+              onClick={() => selectTab('trade-analyzer')}
             >
               Trade Analyzer
             </button>
