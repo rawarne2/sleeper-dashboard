@@ -86,6 +86,7 @@ export default function AllPlayersPage() {
     const url = buildApiUrl(API_CONFIG.ENDPOINTS.PLAYERS_ALL, {
       ...ktcConfigParams(config),
       ...(bundleSeason ? { season: bundleSeason } : {}),
+      ...(selectedLeagueId ? { league_id: selectedLeagueId } : {}),
     });
     const cacheKey = playersAllCacheKey(selectedLeagueId || null, config, bundleSeason ?? null);
     (async () => {
