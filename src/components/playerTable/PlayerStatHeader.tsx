@@ -154,7 +154,7 @@ export function PlayerStatHeader({
         <th
           rowSpan={2}
           scope='col'
-          className={`${cellPad} text-left sticky left-0 z-30 bg-surface-header border-r border-line`}
+          className={`${cellPad} text-left static z-30 bg-surface-header border-r border-line sm:sticky sm:left-0`}
         >
           <ColumnHeader label='Player' tooltip='Player — position and name' align='left' />
         </th>

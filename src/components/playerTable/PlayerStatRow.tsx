@@ -85,11 +85,11 @@ export const PlayerStatRow = memo((props: PlayerStatRowProps) => {
 
   const playerCell = (
     <td
-      className={`${cellPad} align-middle sticky left-0 z-10 bg-[#0e2034] group-hover:bg-[#162640] border-r border-line`}
+      className={`max-w-[44vw] px-1 py-1.5 align-middle static z-10 border-r border-line bg-[#0e2034] group-hover:bg-[#162640] sm:max-w-none sm:sticky sm:left-0 sm:px-1.5`}
     >
-      <div className='flex items-center gap-1.5'>
+      <div className='flex items-center gap-1 sm:gap-1.5'>
         <PositionBadge position={player.position} className='shrink-0' />
-        <span className='min-w-0 truncate text-sm font-medium leading-tight text-ink-hi sm:text-base'>
+        <span className='min-w-0 truncate text-xs font-medium leading-tight text-ink-hi sm:text-base'>
           {playerDisplayName(player)}
         </span>
         {injury && <InjuryChip badge={injury} />}

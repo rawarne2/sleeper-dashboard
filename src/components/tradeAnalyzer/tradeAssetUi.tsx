@@ -153,7 +153,7 @@ export function KtcTradeComparison(props: {
       <div className='grid grid-cols-1 gap-4 md:grid-cols-2'>
         <div>
           <div className='rounded-t-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-gray-100 sm:text-sm'>
-            {props.sideALabel} gets…
+            {props.sideALabel} receives:
           </div>
           <div className='space-y-2 rounded-b-md border border-t-0 border-white/10 bg-black/20 p-2'>
             {props.sideAAssets.length === 0 ? (
@@ -172,7 +172,7 @@ export function KtcTradeComparison(props: {
         </div>
         <div>
           <div className='rounded-t-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-gray-100 sm:text-sm'>
-            {props.sideBLabel} gets…
+            {props.sideBLabel} receives:
           </div>
           <div className='space-y-2 rounded-b-md border border-t-0 border-white/10 bg-black/20 p-2'>
             {props.sideBAssets.length === 0 ? (

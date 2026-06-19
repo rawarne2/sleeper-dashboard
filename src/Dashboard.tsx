@@ -198,6 +198,7 @@ const Dashboard: React.FC = () => {
           role='presentation'
         >
           <div
+            className='w-full max-w-md'
             role='dialog'
             aria-modal='true'
             aria-labelledby='league-change-modal-title'

@@ -34,7 +34,7 @@ export const LeaguePickerCard: React.FC<LeaguePickerCardProps> = ({
 
   return (
     <div
-      className='relative w-full max-w-md rounded-xl border border-gray-500/40 bg-[#0f1729] p-6 shadow-2xl ring-1 ring-white/10'
+      className='relative flex max-h-[92dvh] w-full max-w-md flex-col overflow-y-auto rounded-xl border border-gray-500/40 bg-[#0f1729] p-4 shadow-2xl ring-1 ring-white/10 sm:p-6'
       onClick={(e) => e.stopPropagation()}
     >
       {onClose ? (
@@ -48,31 +48,31 @@ export const LeaguePickerCard: React.FC<LeaguePickerCardProps> = ({
         </button>
       ) : null}
 
-      <div className={`mb-4 flex items-center justify-center gap-2 ${onClose ? 'pr-8' : ''}`}>
-        <TrophyIcon className='h-8 w-8 shrink-0 text-primary-main' />
-        <h1 id={titleId} className='text-lg font-semibold sm:text-xl'>
+      <div className={`mb-3 flex items-center justify-center gap-2 ${onClose ? 'pr-8' : ''}`}>
+        <TrophyIcon className='h-7 w-7 shrink-0 text-primary-main sm:h-8 sm:w-8' />
+        <h1 id={titleId} className='text-base font-semibold sm:text-xl'>
           Sleeper Dynasty Dashboard
         </h1>
       </div>
 
-      <div className='mb-4 text-sm text-gray-400'>{description}</div>
+      <div className='mb-3 text-xs text-gray-400 sm:text-sm'>{description}</div>
 
-      <section className='mb-5'>
+      <section className='mb-4'>
         <p className='mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400'>
           Example Leagues
         </p>
-        <div className='flex flex-col gap-1.5'>
+        <div className='flex flex-col gap-1'>
           {EXAMPLE_LEAGUES.map((l) => {
             const tepLabel = l.tep === 'none' ? 'No TEP' : l.tep.toUpperCase();
             const fmtLabel = l.format === '1qb' ? '1QB' : 'SF';
             return (
               <button key={l.id} type='button' onClick={() => onSelect(l.id)}
-                className='flex w-full flex-col items-start gap-1 rounded-lg border border-line-soft bg-surface-card px-3 py-2 text-left transition-colors hover:border-line hover:bg-surface-overlay'>
-                <span className='text-sm font-semibold text-ink-hi'>{l.name} <span className='text-ink-dim'>· {l.season}</span></span>
-                <span className='flex flex-wrap gap-1'>
-                  <span className='lbl rounded-full border border-line px-2 py-0.5 text-[10px] text-ink-mid'>{fmtLabel}</span>
-                  <span className='lbl rounded-full border border-line px-2 py-0.5 text-[10px] text-ink-mid capitalize'>{l.league_type}</span>
-                  <span className='lbl rounded-full border border-line px-2 py-0.5 text-[10px] text-ink-mid'>{tepLabel}</span>
+                className='flex w-full items-center justify-between gap-2 rounded-lg border border-line-soft bg-surface-card px-3 py-1.5 text-left transition-colors hover:border-line hover:bg-surface-overlay'>
+                <span className='min-w-0 truncate text-sm font-semibold text-ink-hi'>{l.name} <span className='font-normal text-ink-dim'>· {l.season}</span></span>
+                <span className='flex shrink-0 gap-1'>
+                  <span className='lbl rounded-full border border-line px-1.5 py-0.5 text-[10px] text-ink-mid'>{fmtLabel}</span>
+                  <span className='lbl rounded-full border border-line px-1.5 py-0.5 text-[10px] capitalize text-ink-mid'>{l.league_type}</span>
+                  <span className='lbl rounded-full border border-line px-1.5 py-0.5 text-[10px] text-ink-mid'>{tepLabel}</span>
                 </span>
               </button>
             );
