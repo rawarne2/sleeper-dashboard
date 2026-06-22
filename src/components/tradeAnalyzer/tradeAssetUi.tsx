@@ -223,31 +223,21 @@ export function KtcTradeComparison(props: {
         {even ? (
           <p className='text-sm font-semibold text-gray-200 sm:text-base'>Even on KTC value</p>
         ) : favorsA ? (
-          <>
-            <p className='text-sm font-bold text-gray-100 sm:text-base'>
-              ← Favors {props.sideALabel}
-            </p>
-            <p className='mt-1 text-xs text-red-300/90 sm:text-sm'>
-              Add about{' '}
-              <span className='font-bold tabular-nums text-red-200'>
-                {diff.toLocaleString()}
-              </span>{' '}
-              KTC to {props.sideBLabel} to even the trade →
-            </p>
-          </>
+          <p className='text-sm font-semibold text-gray-100 sm:text-base'>
+            {props.sideALabel} gains{' '}
+            <span className='font-bold tabular-nums text-green-300'>
+              {diff.toLocaleString()}
+            </span>{' '}
+            more value than {props.sideBLabel}
+          </p>
         ) : (
-          <>
-            <p className='text-sm font-bold text-gray-100 sm:text-base'>
-              Favors {props.sideBLabel} →
-            </p>
-            <p className='mt-1 text-xs text-red-300/90 sm:text-sm'>
-              ← Add about{' '}
-              <span className='font-bold tabular-nums text-red-200'>
-                {diff.toLocaleString()}
-              </span>{' '}
-              KTC to {props.sideALabel} to even the trade
-            </p>
-          </>
+          <p className='text-sm font-semibold text-gray-100 sm:text-base'>
+            {props.sideBLabel} gains{' '}
+            <span className='font-bold tabular-nums text-green-300'>
+              {diff.toLocaleString()}
+            </span>{' '}
+            more value than {props.sideALabel}
+          </p>
         )}
       </div>
     </div>

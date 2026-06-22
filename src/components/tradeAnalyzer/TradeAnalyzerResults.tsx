@@ -7,7 +7,9 @@ import type {
 } from '../../types';
 import {
   KtcTradeComparison,
+  tradeValueToneClass,
   type TradeAssetRow,
+  type TradeValueTone,
 } from './tradeAssetUi';
 import {
   resolveSideTradeGrade,
@@ -56,16 +58,66 @@ function TradeGradeBadge(props: { grade: string; className?: string }) {
 function TeamGradeRow(props: {
   teamName: string;
   grade: string;
+  valueDelta?: number | null;
 }) {
+  const deltaTone: TradeValueTone =
+    props.valueDelta == null || props.valueDelta === 0
+      ? 'even'
+      : props.valueDelta > 0
+        ? 'win'
+        : 'lose';
+  const deltaLabel =
+    props.valueDelta == null
+      ? null
+      : props.valueDelta === 0
+        ? '±0'
+        : props.valueDelta > 0
+          ? `+${props.valueDelta.toLocaleString()}`
+          : props.valueDelta.toLocaleString();
+
   return (
-    <div className='flex min-w-0 flex-wrap items-center gap-2'>
+    <div className='flex min-w-0 flex-wrap items-center justify-center gap-2'>
       <span className='truncate text-xs font-semibold text-gray-200 sm:text-sm'>
         {props.teamName}
       </span>
-      <span className='text-gray-500' aria-hidden>
-        ·
-      </span>
       <TradeGradeBadge grade={props.grade} />
+      {deltaLabel ? (
+        <span
+          className={`text-xs font-bold tabular-nums sm:text-sm ${tradeValueToneClass(deltaTone)}`}
+        >
+          {deltaLabel}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function TradeGradesHeader(props: {
+  sideATeamName: string;
+  sideBTeamName: string;
+  gradeA: string;
+  gradeB: string;
+  sideAValueDelta: number;
+  sideBValueDelta: number;
+}) {
+  return (
+    <div className='text-center'>
+      <div className='text-xs font-semibold text-gray-200 sm:text-sm'>Trade grades</div>
+      <div className='mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs sm:text-sm'>
+        <TeamGradeRow
+          teamName={props.sideATeamName}
+          grade={props.gradeA}
+          valueDelta={props.sideAValueDelta}
+        />
+        <span className='text-[10px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs'>
+          vs
+        </span>
+        <TeamGradeRow
+          teamName={props.sideBTeamName}
+          grade={props.gradeB}
+          valueDelta={props.sideBValueDelta}
+        />
+      </div>
     </div>
   );
 }
@@ -128,6 +180,8 @@ export function AnalysisResultsPanel(props: {
   const sideBReceives = assetsFromSide(entry.side_a);
   const gradeA = resolveSideTradeGrade(res.side_a, res.winner, 'a');
   const gradeB = resolveSideTradeGrade(res.side_b, res.winner, 'b');
+  const sideAValueDelta = entry.side_b.ktc_subtotal - entry.side_a.ktc_subtotal;
+  const sideBValueDelta = entry.side_a.ktc_subtotal - entry.side_b.ktc_subtotal;
 
   return (
     <div
@@ -154,7 +208,14 @@ export function AnalysisResultsPanel(props: {
             : 'mt-2 rounded-xl border border-white/10 bg-black/10 p-3 sm:p-4'
         }
       >
-        <div className='text-xs font-semibold text-gray-200 sm:text-sm'>Trade grades</div>
+        <TradeGradesHeader
+          sideATeamName={entry.side_a.team_name}
+          sideBTeamName={entry.side_b.team_name}
+          gradeA={gradeA}
+          gradeB={gradeB}
+          sideAValueDelta={sideAValueDelta}
+          sideBValueDelta={sideBValueDelta}
+        />
         <div className='mt-3'>
           <KtcTradeComparison
             sideALabel={entry.side_a.team_name}

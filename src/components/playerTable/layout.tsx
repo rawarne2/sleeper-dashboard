@@ -48,7 +48,7 @@ export const LeafTh = ({
 /**
  * Total leaf-column count for a table variant, used for full-width `colSpan`s
  * (section dividers + expand row in standings, the empty-state row in All Players).
- * Shared run = Consensus, KTC, FC, (Redraft), Vol, Liq, RankPos, RankOvr, TierPos, TierOvr.
+ * Shared run = Consensus, KTC, FC, (Redraft), 30 Day, Liq, Vol, RankPos, RankOvr, TierPos, TierOvr.
  */
 export function statColumnCount(
   variant: 'standings' | 'all-players',
