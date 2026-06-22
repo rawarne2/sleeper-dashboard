@@ -679,7 +679,10 @@ export const TradeAnalyzerPage: React.FC = () => {
           </div>
         ) : null}
 
-        <div className='mt-3 grid grid-cols-1 gap-4 md:grid-cols-2'>
+        <p className='mt-3 text-xs text-gray-400 sm:text-sm'>
+          Values shown next to each player and pick are KTC values.
+        </p>
+        <div className='mt-2 grid grid-cols-1 gap-4 md:grid-cols-2'>
           <SideCard
             title={
               sideATeam ? teamDisplayName(sideATeam) : 'Team 1'

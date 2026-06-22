@@ -194,7 +194,7 @@ export function KtcTradeComparison(props: {
       <div
         className='relative h-6 overflow-hidden rounded-sm bg-rose-950/40 sm:h-7'
         role='img'
-        aria-label={`${props.sideALabel} ${a.toLocaleString()} KTC versus ${props.sideBLabel} ${b.toLocaleString()} KTC`}
+        aria-label={`${props.sideALabel} ${a.toLocaleString()} value versus ${props.sideBLabel} ${b.toLocaleString()} value`}
       >
         <div
           className={`absolute inset-y-0 left-0 ${favorsA ? 'bg-green-600/85' : favorsB ? 'bg-red-600/85' : 'bg-gray-500/70'}`}
@@ -207,21 +207,23 @@ export function KtcTradeComparison(props: {
         />
         <span
           className='pointer-events-none absolute inset-y-0 left-1 z-20 flex max-w-[45%] items-center truncate px-1 text-[10px] font-bold tabular-nums text-white drop-shadow sm:text-xs'
-          title={`${props.sideALabel}: ${a.toLocaleString()} KTC`}
+          title={`${props.sideALabel}: ${a.toLocaleString()} value`}
         >
           {a.toLocaleString()}
         </span>
         <span
           className='pointer-events-none absolute inset-y-0 right-1 z-20 flex max-w-[45%] items-center justify-end truncate px-1 text-[10px] font-bold tabular-nums text-white drop-shadow sm:text-xs'
-          title={`${props.sideBLabel}: ${b.toLocaleString()} KTC`}
+          title={`${props.sideBLabel}: ${b.toLocaleString()} value`}
         >
           {b.toLocaleString()}
         </span>
       </div>
 
-      <div className='rounded-md border border-rose-900/35 bg-rose-950/25 px-3 py-3 text-center sm:px-4'>
+      <div className='rounded-md border border-white/10 bg-white/[0.03] px-3 py-3 text-center sm:px-4'>
         {even ? (
-          <p className='text-sm font-semibold text-gray-200 sm:text-base'>Even on KTC value</p>
+          <p className='text-sm font-semibold text-gray-200 sm:text-base'>
+            Even consensus value
+          </p>
         ) : favorsA ? (
           <p className='text-sm font-semibold text-gray-100 sm:text-base'>
             {props.sideALabel} gains{' '}

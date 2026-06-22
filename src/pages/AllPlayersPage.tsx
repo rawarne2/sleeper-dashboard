@@ -160,7 +160,7 @@ export default function AllPlayersPage() {
       return {
         player,
         team: player.team ?? '',
-        consensus: v?.blended ?? null,
+        consensus: v?.consensus ?? null,
         trend: fc?.trend_30day ?? null,
         ktc: v?.sources?.ktc?.value ?? null,
         fc: fc?.value ?? null,

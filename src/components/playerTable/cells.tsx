@@ -4,7 +4,7 @@ import { formatValue, sourceMeta, trendInfo } from '../../utils/valueDisplay';
 
 /** Consensus (KTC+FC blend) hero number — its own column (trend is separate now). */
 export function ConsensusCell({ values }: { values?: ValuesBlock | null }) {
-  const consensus = values?.blended ?? null;
+  const consensus = values?.consensus ?? null;
   return (
     <div className='flex items-baseline justify-center'>
       <span className='num text-[15px] font-semibold leading-none text-ink-hi'>{formatValue(consensus)}</span>

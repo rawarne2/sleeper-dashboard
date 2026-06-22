@@ -88,7 +88,7 @@ export function PlayerStatHeader({
       <GroupTh label='Proj' tip='Projected fantasy points' span={2} />
       <GroupTh
         label='Trade value'
-        tip='Trade values blended from KTC and FantasyCalc'
+        tip='Consensus trade value (KTC and FantasyCalc)'
         span={tradeSpan}
       />
       <GroupTh label='KTC Rank' tip='KeepTradeCut rankings' span={2} />
