@@ -448,7 +448,7 @@ export const TradeAnalyzerPage: React.FC = () => {
     state.pendingFeedbackAnalysisId != null &&
     pinnedEntry?.response?.analysis_id === state.pendingFeedbackAnalysisId;
 
-  const showRecentSection = history.length > 0 && (!showPinnedResults || !hasTradeBuilderAssets);
+  const showRecentSection = history.length > 0;
 
   const handleFeedbackSubmit = async (v: GateValues) => {
     const id = state.pendingFeedbackAnalysisId;
@@ -470,6 +470,15 @@ export const TradeAnalyzerPage: React.FC = () => {
           league_id: selectedLeagueId ?? '', skipped: true });
       } catch { /* skip is best-effort */ }
     }
+    setFeedbackError(null);
+    setFeedbackDone(false);
+    dispatch({ type: 'feedbackResolved' });
+    setPinnedAnalysisId(null);
+    setExpandedHistoryId(null);
+    builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const handleClearTrade = () => {
     setFeedbackError(null);
     setFeedbackDone(false);
     dispatch({ type: 'feedbackResolved' });
@@ -748,11 +757,11 @@ export const TradeAnalyzerPage: React.FC = () => {
           />
         </div>
 
-        <div className='mt-3 flex flex-col gap-2'>
+        <div className='mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch'>
           <button
             type='button'
             disabled={!canAnalyze}
-            className='inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-main px-4 py-3 text-sm sm:text-base font-semibold text-white shadow-lg ring-1 ring-white/10 transition-[filter,opacity] hover:brightness-110 disabled:pointer-events-none disabled:opacity-45'
+            className='inline-flex w-full flex-1 items-center justify-center gap-2 rounded-lg bg-primary-main px-4 py-3 text-sm sm:text-base font-semibold text-white shadow-lg ring-1 ring-white/10 transition-[filter,opacity] hover:brightness-110 disabled:pointer-events-none disabled:opacity-45'
             onClick={() => {
               dispatch({ type: 'setAnalysisError', message: null });
               dispatch({ type: 'setRateLimitUntil', untilMs: null, message: null });
@@ -854,6 +863,16 @@ export const TradeAnalyzerPage: React.FC = () => {
               </>
             )}
           </button>
+          <button
+            type='button'
+            disabled={!isReady || !hasTradeBuilderAssets}
+            onClick={handleClearTrade}
+            className='inline-flex w-full items-center justify-center rounded-lg border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-gray-200 transition-colors hover:border-white/25 hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-45 sm:w-auto sm:min-w-[8.5rem]'
+          >
+            Clear trade
+          </button>
+        </div>
+        <div className='mt-2 flex flex-col gap-2'>
           {rateLimitText ? (
             <div className='text-xs sm:text-sm text-red-300'>{rateLimitText}</div>
           ) : state.rateLimitMessage ? (

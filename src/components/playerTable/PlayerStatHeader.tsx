@@ -112,7 +112,6 @@ export function PlayerStatHeader({
         tint
       />
       <ValTh label='Consensus' tip='Consensus — average of KTC and FantasyCalc.' k='consensus' edge sort={sort} />
-      <ValTh label='30 Day' tip='FantasyCalc 30-day value trend (arrow + change).' k='trend' sort={sort} />
       <ValTh sort={sort} label='KTC' tip='KeepTradeCut trade value' k='ktc' tint />
       <ValTh
         sort={sort}
@@ -123,18 +122,19 @@ export function PlayerStatHeader({
       {showRedraft && (
         <ValTh sort={sort} label='Redraft' tip='FantasyCalc redraft (win-now) value' k='redraft' tint />
       )}
+      <ValTh label='30 Day' tip='FantasyCalc 30-day value trend (arrow + change).' k='trend' sort={sort} />
+      <ValTh
+        sort={sort}
+        label='Liq'
+        tip='Trade liquidity — how frequently this player is traded (FantasyCalc trade frequency)'
+        k='liq'
+        tint
+      />
       <ValTh
         sort={sort}
         label='Vol'
         tip='FantasyCalc value volatility — higher means a less settled price'
         k='vol'
-      />
-      <ValTh
-        sort={sort}
-        label='Liq'
-        tip='Trade liquidity — how frequently this player is traded'
-        k='liq'
-        tint
       />
       <ValTh sort={sort} label='Pos' tip='KTC positional rank' k='rankPos' defaultDir='asc' edge />
       <ValTh sort={sort} label='Ovr' tip='KTC overall rank' k='rank' defaultDir='asc' tint />

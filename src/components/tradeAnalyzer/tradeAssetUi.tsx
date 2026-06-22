@@ -224,11 +224,21 @@ export function KtcTradeComparison(props: {
           <p className='text-sm font-semibold text-gray-200 sm:text-base'>
             Even consensus value
           </p>
+        ) : favorsA ? (
+          <p className='text-sm font-semibold text-gray-100 sm:text-base'>
+            {props.sideALabel} gains{' '}
+            <span className='font-bold tabular-nums text-green-300'>
+              {diff.toLocaleString()}
+            </span>{' '}
+            more value than {props.sideBLabel}
+          </p>
         ) : (
-          <p className='text-sm font-bold text-gray-100 sm:text-base'>
-            {favorsA ? props.sideALabel : props.sideBLabel} gains{' '}
-            <span className='tabular-nums text-green-300'>{diff.toLocaleString()}</span>{' '}
-            more value than {favorsA ? props.sideBLabel : props.sideALabel}
+          <p className='text-sm font-semibold text-gray-100 sm:text-base'>
+            {props.sideBLabel} gains{' '}
+            <span className='font-bold tabular-nums text-green-300'>
+              {diff.toLocaleString()}
+            </span>{' '}
+            more value than {props.sideALabel}
           </p>
         )}
       </div>

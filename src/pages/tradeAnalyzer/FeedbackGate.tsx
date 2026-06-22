@@ -90,8 +90,8 @@ export function FeedbackGate(props: {
             }
             className={`rounded px-3 py-1 text-xs font-semibold transition ${
               canSubmit
-                ? 'bg-amber-400 text-black hover:bg-amber-300'
-                : 'cursor-not-allowed bg-white/10 text-gray-500'
+                ? '!border-amber-300/60 !bg-amber-400 !text-gray-900 hover:!bg-amber-300'
+                : 'cursor-not-allowed !border-transparent !bg-white/10 !text-gray-400'
             }`}
           >
             {props.submitting ? 'Saving…' : 'Submit feedback'}

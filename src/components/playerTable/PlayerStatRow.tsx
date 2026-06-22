@@ -149,14 +149,26 @@ export const PlayerStatRow = memo((props: PlayerStatRowProps) => {
   const valueRunCells = (
     <>
       <td className={`${cellPad} text-center align-middle ${GROUP_EDGE} min-w-[72px]`}><ConsensusCell values={v} /></td>
-      <Cell><TrendCell trend30={fc?.trend_30day} /></Cell>
       <Cell tint><SourceValueCell sourceKey='ktc' value={v?.sources?.ktc?.value} /></Cell>
       <Cell><SourceValueCell sourceKey='fantasycalc' value={fc?.value} /></Cell>
       {showRedraft && <Cell tint><NumCell>{formatValue(fc?.redraft_value)}</NumCell></Cell>}
-      <Cell><NumCell>{formatCount(fc?.volatility)}</NumCell></Cell>
-      <Cell tint><NumCell>{formatLiquidity(fc?.trade_frequency)}</NumCell></Cell>
+      <Cell><TrendCell trend30={fc?.trend_30day} /></Cell>
+      <Cell tint>
+        <span className='num text-sm font-medium leading-none text-ktc'>
+          {formatLiquidity(fc?.trade_frequency)}
+        </span>
+      </Cell>
+      <Cell>
+        <span className='num text-sm font-medium leading-none text-fc'>
+          {formatCount(fc?.volatility)}
+        </span>
+      </Cell>
       <Cell edge><NumCell tone='strong'>{ktcv?.positionalRank != null ? `${player.position}${ktcv.positionalRank}` : '—'}</NumCell></Cell>
-      <Cell tint><NumCell>{formatCount(ktcv?.rank)}</NumCell></Cell>
+      <Cell tint>
+        <span className='num text-sm font-medium leading-none text-ktc'>
+          {formatCount(ktcv?.rank)}
+        </span>
+      </Cell>
       <Cell edge><NumCell tone='strong'>{ktcv?.positionalTier != null ? `T${ktcv.positionalTier}` : '—'}</NumCell></Cell>
       <Cell tint><NumCell>{ktcv?.overallTier != null ? `T${ktcv.overallTier}` : '—'}</NumCell></Cell>
     </>
