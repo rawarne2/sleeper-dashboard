@@ -10,6 +10,7 @@ import type {
   TradeAnalyzerResponse,
 } from '../types';
 import {
+  consensusValue,
   ktcDisplayValues,
   ktcRankLabel,
   playerDisplayName as sharedPlayerDisplayName,
@@ -33,6 +34,13 @@ async function openPrefsDb() {
 export function ktcValueForPlayer(p: Player): number {
   const v = ktcDisplayValues(p)?.value;
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+}
+
+// Consensus (KTC + FantasyCalc) value, falling back to the KTC value when the
+// blended consensus is not available (e.g. players with only one source).
+export function consensusValueForPlayer(p: Player): number {
+  const v = consensusValue(p);
+  return typeof v === 'number' && Number.isFinite(v) ? v : ktcValueForPlayer(p);
 }
 
 export function playerDisplayName(p: Player): string {
@@ -68,16 +76,23 @@ export function buildTradeAnalyzerHistoryEntry(args: {
       name: playerDisplayName(p),
       position: p.position,
       ktc_value: ktcValueForPlayer(p),
+      consensus_value: consensusValueForPlayer(p),
       rank_label: playerRankLabel(p),
     }));
     const pickRows = picks.map((p) => ({
       pick_id: p.pick_id,
       label: args.pickLabel(p),
       ktc_value: p.ktc_value ?? 0,
+      consensus_value: p.ktc_value ?? 0,
     }));
     const ktc_subtotal =
       players.reduce((s, x) => s + x.ktc_value, 0) +
       pickRows.reduce((s, x) => s + x.ktc_value, 0);
+    // Consensus subtotal: players use the blended consensus (fallback KTC);
+    // picks have no FantasyCalc value, so they fall back to their KTC value.
+    const consensus_subtotal =
+      players.reduce((s, x) => s + x.consensus_value, 0) +
+      pickRows.reduce((s, x) => s + x.consensus_value, 0);
     return {
       roster_id: rosterId,
       team_name: team ? team.user.metadata?.team_name || team.user.team_name || team.user.display_name : `Roster ${rosterId}`,
@@ -85,6 +100,7 @@ export function buildTradeAnalyzerHistoryEntry(args: {
       players,
       picks: pickRows,
       ktc_subtotal,
+      consensus_subtotal,
     };
   };
 
@@ -183,14 +199,17 @@ export async function loadTradeAnalyzerHistory(): Promise<TradeAnalyzerHistoryEn
           player_id: id,
           name: id,
           ktc_value: 0,
+          consensus_value: 0,
           rank_label: null,
         })),
         picks: legacy.request.side_a.pick_ids.map((pid) => ({
           pick_id: pid,
           label: pid,
           ktc_value: 0,
+          consensus_value: 0,
         })),
         ktc_subtotal: 0,
+        consensus_subtotal: 0,
       },
       side_b: {
         roster_id: legacy.request.side_b.roster_id,
@@ -200,14 +219,17 @@ export async function loadTradeAnalyzerHistory(): Promise<TradeAnalyzerHistoryEn
           player_id: id,
           name: id,
           ktc_value: 0,
+          consensus_value: 0,
           rank_label: null,
         })),
         picks: legacy.request.side_b.pick_ids.map((pid) => ({
           pick_id: pid,
           label: pid,
           ktc_value: 0,
+          consensus_value: 0,
         })),
         ktc_subtotal: 0,
+        consensus_subtotal: 0,
       },
     };
     await db.put('app_prefs', {

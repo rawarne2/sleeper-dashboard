@@ -145,8 +145,8 @@ const SOURCE_LABELS: Record<string, string> = {
   fantasycalc: 'FC',
 };
 
-export function blendedValue(player: Player): number | null {
-  return player.values?.blended ?? null;
+export function consensusValue(player: Player): number | null {
+  return player.values?.consensus ?? null;
 }
 
 export interface SourceChipData { key: string; label: string; value: number | null; }

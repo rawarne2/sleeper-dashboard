@@ -9,7 +9,10 @@ export default defineConfig({
     host: true
   },
   test: {
-    environment: 'jsdom',
+    // happy-dom (not jsdom): jsdom 28 pulls an ESM-only @exodus/bytes that
+    // Node < 20.19 cannot require(), breaking the whole suite. happy-dom is
+    // pure ESM and provides the DOM APIs these tests need.
+    environment: 'happy-dom',
     setupFiles: ['./src/__tests__/setup.ts'],
   },
 })

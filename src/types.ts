@@ -122,6 +122,8 @@ export interface TradeAnalyzerPlayerSnapshot {
     name: string;
     position?: string;
     ktc_value: number;
+    /** Consensus (KTC+FantasyCalc) value, falling back to KTC when unavailable. */
+    consensus_value: number;
     rank_label: string | null;
 }
 
@@ -129,6 +131,8 @@ export interface TradeAnalyzerPickSnapshot {
     pick_id?: string;
     label: string;
     ktc_value: number;
+    /** Picks have no FantasyCalc value, so this equals ktc_value. */
+    consensus_value: number;
 }
 
 export interface TradeAnalyzerSideSnapshot {
@@ -138,6 +142,8 @@ export interface TradeAnalyzerSideSnapshot {
     players: TradeAnalyzerPlayerSnapshot[];
     picks: TradeAnalyzerPickSnapshot[];
     ktc_subtotal: number;
+    /** Sum of consensus (KTC+FantasyCalc) values for assets this side trades away. */
+    consensus_subtotal: number;
 }
 
 export interface TradeAnalyzerHistoryEntry {
@@ -229,7 +235,7 @@ export interface SourceValue {
 }
 
 export interface ValuesBlock {
-  blended?: number | null;
+  consensus?: number | null;
   sources?: Partial<Record<'ktc' | 'fantasycalc', SourceValue>>;
   projection?: { proj_ros?: number | null; proj_week?: number | null };
 }
@@ -241,6 +247,22 @@ export interface PlayerStats {
     average_points?: number;
     total_points?: number;
     games_played?: number;
+}
+
+/** Opportunity/usage metrics derived from raw Sleeper weekly stat lines. */
+export interface UsageBlock {
+    /** Season offensive snap share, percent (0–100). */
+    snap_pct?: number;
+    /** Last-3-week offensive snap share, percent (0–100). */
+    snap_pct_l3?: number;
+    /** Snap-share trend label vs season, e.g. "+5.2 vs season". */
+    snap_trend?: string;
+    targets_per_game?: number;
+    carries_per_game?: number;
+    air_yards_per_game?: number;
+    /** Red-zone targets + carries, season total. */
+    rz_opps?: number;
+    games_started?: number;
 }
 
 /** Compact ownership snapshot for the latest research week (server-attached). */
@@ -289,8 +311,12 @@ export interface Player {
     practice_description?: string | null;
     ktc?: KTCData;
     values?: ValuesBlock | null;
-    /** Aggregated season stats from SleeperWeeklyData (avg/total/games). */
+    /** Aggregated season stats from the scoring engine (avg/total/games). */
     stats?: PlayerStats;
+    /** Previous-season aggregated stats (avg/total/games). */
+    stats_prev?: PlayerStats | null;
+    /** Opportunity/usage metrics (snap share, targets, air yards, RZ touches). */
+    usage?: UsageBlock | null;
     /** Latest research-week ownership snapshot from `_attach_research_latest`. */
     research_latest?: ResearchLatest | null;
     owned?: number;

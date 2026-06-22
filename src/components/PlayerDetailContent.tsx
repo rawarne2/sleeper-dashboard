@@ -13,11 +13,15 @@ import {
   ktcDisplayValues,
   showByeForSeason,
   valueSources,
-  blendedValue,
+  consensusValue,
   resolveInjury,
   resolveOwnership,
   playerDisplayName,
 } from '../playerFunctions';
+
+/** "82%" from a percent value (0–100), else em dash. */
+const formatPct = (v?: number | null): string =>
+  typeof v === 'number' && Number.isFinite(v) ? `${Math.round(v)}%` : '—';
 
 const TrendingChip = () => (
   <span className='ml-1 inline-flex items-center rounded border border-amber-500/30 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-300'>
@@ -117,6 +121,14 @@ export const PlayerDetailContent = memo(({
   const ktcInjury = formatKtcInjury(ktc?.injury);
   const showBye = showByeForSeason(bundleSeason, leagueSeason) && ktc?.byeWeek != null;
   const stats = player.stats;
+  const statsPrev = player.stats_prev;
+  const usage = player.usage;
+  const hasUsage = !!usage && (
+    usage.snap_pct != null || usage.snap_pct_l3 != null || usage.targets_per_game != null ||
+    usage.carries_per_game != null || usage.air_yards_per_game != null ||
+    usage.rz_opps != null || usage.games_started != null
+  );
+  const projWeekLabel = researchWeek != null ? `Sleeper week ${researchWeek} proj` : 'Sleeper proj';
   const ownership = resolveOwnership(player, ownershipMap ?? {});
   const pickLabel =
     ktc?.pickRound != null && ktc?.pickNum != null
@@ -191,6 +203,39 @@ export const PlayerDetailContent = memo(({
             <StaticField label='Jersey' value={player.number != null ? `#${player.number}` : '—'} />
             <StaticField label='Team' value={player.team || 'FA'} />
           </div>
+          {(hasUsage ||
+            statsPrev?.average_points != null ||
+            statsPrev?.games_played != null) && (
+            <div className='grid grid-cols-2 gap-x-3 gap-y-2 rounded border border-line bg-white/[0.02] px-2.5 py-2 sm:grid-cols-3 md:grid-cols-4'>
+              {usage?.snap_pct != null && (
+                <StaticField label='Snap %' value={formatPct(usage.snap_pct)} />
+              )}
+              {usage?.snap_pct_l3 != null && (
+                <StaticField label='Snap % (L3)' value={formatPct(usage.snap_pct_l3)} />
+              )}
+              {usage?.targets_per_game != null && (
+                <StaticField label='Targets/g' value={usage.targets_per_game.toFixed(1)} />
+              )}
+              {usage?.carries_per_game != null && (
+                <StaticField label='Carries/g' value={usage.carries_per_game.toFixed(1)} />
+              )}
+              {usage?.air_yards_per_game != null && (
+                <StaticField label='Air yds/g' value={usage.air_yards_per_game.toFixed(1)} />
+              )}
+              {usage?.rz_opps != null && (
+                <StaticField label='RZ touches' value={usage.rz_opps} />
+              )}
+              {statsPrev?.average_points != null && (
+                <StaticField label='Last yr avg' value={formatPoints(statsPrev.average_points)} />
+              )}
+              {statsPrev?.total_points != null && (
+                <StaticField label='Last yr total' value={formatPoints(statsPrev.total_points)} />
+              )}
+              {statsPrev?.games_played != null && (
+                <StaticField label='Last yr GP' value={statsPrev.games_played} />
+              )}
+            </div>
+          )}
           {injury && (
             <div
               className={`flex items-baseline gap-2 rounded border px-2.5 py-1.5 text-sm ${
@@ -206,6 +251,55 @@ export const PlayerDetailContent = memo(({
         </div>
       ) : (
       <div className='grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3'>
+        {player.values && (
+          <DetailGroup title='Sources'>
+            <DetailItem label='Consensus' value={consensusValue(player)?.toLocaleString() ?? '—'} />
+            {valueSources(player).map((s) => (
+              <DetailItem key={s.key} label={s.label} value={s.value?.toLocaleString() ?? '—'} />
+            ))}
+            {player.values.sources?.fantasycalc?.trade_frequency != null && (
+              <DetailItem label='FC liquidity'
+                value={`${(player.values.sources.fantasycalc.trade_frequency * 100).toFixed(2)}%`} />
+            )}
+            {player.values.projection?.proj_week != null && (
+              <DetailItem label={projWeekLabel}
+                value={player.values.projection.proj_week.toFixed(1)} />
+            )}
+          </DetailGroup>
+        )}
+
+        {(ownership?.owned != null || ownership?.started != null) && (
+            <DetailGroup title='Ownership'>
+              {researchWeek != null && (
+                <DetailItem label='Week' value={`Wk ${researchWeek}`} />
+              )}
+              {ownership?.owned != null && (
+                <DetailItem
+                  label='Owned'
+                  value={
+                    <span
+                      className={`font-medium tabular-nums ${getOwnershipTier(ownership.owned)}`}
+                    >
+                      {ownership.owned}%
+                    </span>
+                  }
+                />
+              )}
+              {ownership?.started != null && (
+                <DetailItem
+                  label='Started'
+                  value={
+                    <span
+                      className={`font-medium tabular-nums ${getOwnershipTier(ownership.started)}`}
+                    >
+                      {ownership.started}%
+                    </span>
+                  }
+                />
+              )}
+            </DetailGroup>
+          )}
+
         <DetailGroup title='Profile'>
           <DetailItem
             Icon={UserIcon}
@@ -299,19 +393,35 @@ export const PlayerDetailContent = memo(({
               )}
         </DetailGroup>
 
-        {player.values && (
-          <DetailGroup title='Sources'>
-            <DetailItem label='Consensus' value={blendedValue(player)?.toLocaleString() ?? '—'} />
-            {valueSources(player).map((s) => (
-              <DetailItem key={s.key} label={s.label} value={s.value?.toLocaleString() ?? '—'} />
-            ))}
-            {player.values.sources?.fantasycalc?.trade_frequency != null && (
-              <DetailItem label='FC liquidity'
-                value={`${(player.values.sources.fantasycalc.trade_frequency * 100).toFixed(2)}%`} />
+        {hasUsage && (
+          <DetailGroup title='Usage'>
+            {usage?.snap_pct != null && (
+              <DetailItem
+                label='Snap %'
+                value={
+                  usage.snap_trend
+                    ? `${formatPct(usage.snap_pct)} (${usage.snap_trend})`
+                    : formatPct(usage.snap_pct)
+                }
+              />
             )}
-            {player.values.projection?.proj_week != null && (
-              <DetailItem label='Sleeper proj (wk)'
-                value={player.values.projection.proj_week.toFixed(1)} />
+            {usage?.snap_pct_l3 != null && (
+              <DetailItem label='Snap % (L3)' value={formatPct(usage.snap_pct_l3)} />
+            )}
+            {usage?.targets_per_game != null && (
+              <DetailItem label='Targets/g' value={usage.targets_per_game.toFixed(1)} />
+            )}
+            {usage?.carries_per_game != null && (
+              <DetailItem label='Carries/g' value={usage.carries_per_game.toFixed(1)} />
+            )}
+            {usage?.air_yards_per_game != null && (
+              <DetailItem label='Air yds/g' value={usage.air_yards_per_game.toFixed(1)} />
+            )}
+            {usage?.rz_opps != null && (
+              <DetailItem label='RZ touches' value={usage.rz_opps} />
+            )}
+            {usage?.games_started != null && (
+              <DetailItem label='Games started' value={usage.games_started} />
             )}
           </DetailGroup>
         )}
@@ -326,35 +436,13 @@ export const PlayerDetailContent = memo(({
             </DetailGroup>
           )}
 
-        {(ownership?.owned != null || ownership?.started != null) && (
-            <DetailGroup title='Ownership'>
-              {researchWeek != null && (
-                <DetailItem label='Week' value={`Wk ${researchWeek}`} />
-              )}
-              {ownership?.owned != null && (
-                <DetailItem
-                  label='Owned'
-                  value={
-                    <span
-                      className={`font-medium tabular-nums ${getOwnershipTier(ownership.owned)}`}
-                    >
-                      {ownership.owned}%
-                    </span>
-                  }
-                />
-              )}
-              {ownership?.started != null && (
-                <DetailItem
-                  label='Started'
-                  value={
-                    <span
-                      className={`font-medium tabular-nums ${getOwnershipTier(ownership.started)}`}
-                    >
-                      {ownership.started}%
-                    </span>
-                  }
-                />
-              )}
+        {(statsPrev?.average_points != null ||
+            statsPrev?.total_points != null ||
+            statsPrev?.games_played != null) && (
+            <DetailGroup title='Last season'>
+              <DetailItem label='Avg' value={formatPoints(statsPrev?.average_points)} />
+              <DetailItem label='Total' value={formatPoints(statsPrev?.total_points)} />
+              <DetailItem label='GP' value={statsPrev?.games_played ?? '—'} />
             </DetailGroup>
           )}
 

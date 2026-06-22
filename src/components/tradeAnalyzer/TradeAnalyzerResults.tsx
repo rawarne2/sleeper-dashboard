@@ -22,13 +22,13 @@ function assetsFromSide(side: TradeAnalyzerHistoryEntry['side_a']): TradeAssetRo
       key: p.player_id,
       name: p.name,
       position: p.position,
-      ktc: p.ktc_value,
+      ktc: p.consensus_value,
       rankLabel: p.rank_label,
     })),
     ...picks.map((p, i) => ({
       key: `${p.pick_id ?? p.label}-${i}`,
       name: p.label,
-      ktc: p.ktc_value,
+      ktc: p.consensus_value,
       rankLabel: null,
     })),
   ];
@@ -56,7 +56,9 @@ function TradeGradeBadge(props: { grade: string; className?: string }) {
 function TeamGradeRow(props: {
   teamName: string;
   grade: string;
+  net?: number;
 }) {
+  const net = props.net;
   return (
     <div className='flex min-w-0 flex-wrap items-center gap-2'>
       <span className='truncate text-xs font-semibold text-gray-200 sm:text-sm'>
@@ -66,6 +68,17 @@ function TeamGradeRow(props: {
         ·
       </span>
       <TradeGradeBadge grade={props.grade} />
+      {net != null ? (
+        <span
+          className={`tabular-nums text-xs font-semibold sm:text-sm ${
+            net > 0 ? 'text-green-400' : net < 0 ? 'text-red-400' : 'text-gray-400'
+          }`}
+          title='Net consensus value (received − given)'
+        >
+          {net > 0 ? '+' : net < 0 ? '−' : ''}
+          {Math.abs(net).toLocaleString()}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -75,6 +88,7 @@ function ResultsColumn(props: {
   teamSubtitle: string;
   grade: string;
   data: TradeAnalyzerResponse['side_a'];
+  summaryBullet?: string;
 }) {
   const hasPros = props.data.pros.length > 0;
   const hasCons = props.data.cons.length > 0;
@@ -112,6 +126,12 @@ function ResultsColumn(props: {
             </ul>
           </div>
         ) : null}
+        {props.summaryBullet ? (
+          <div className='rounded-lg border border-white/10 bg-white/5 p-2 sm:p-3'>
+            <div className='text-xs font-semibold text-gray-200 sm:text-sm'>Summary</div>
+            <p className='mt-2 text-xs text-gray-300 sm:text-sm'>{props.summaryBullet}</p>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -128,6 +148,11 @@ export function AnalysisResultsPanel(props: {
   const sideBReceives = assetsFromSide(entry.side_a);
   const gradeA = resolveSideTradeGrade(res.side_a, res.winner, 'a');
   const gradeB = resolveSideTradeGrade(res.side_b, res.winner, 'b');
+  // Net consensus value each side nets out of the deal (received − given).
+  const netA = Math.round(
+    (entry.side_b.consensus_subtotal ?? 0) - (entry.side_a.consensus_subtotal ?? 0)
+  );
+  const netB = -netA;
 
   return (
     <div
@@ -154,32 +179,24 @@ export function AnalysisResultsPanel(props: {
             : 'mt-2 rounded-xl border border-white/10 bg-black/10 p-3 sm:p-4'
         }
       >
-        <div className='text-xs font-semibold text-gray-200 sm:text-sm'>Trade grades</div>
+        <div className='flex flex-wrap items-center justify-between gap-2'>
+          <span className='text-xs font-semibold text-gray-200 sm:text-sm'>Trade grades</span>
+          <div className='flex items-center gap-2'>
+            <TeamGradeRow teamName={entry.side_a.team_name} grade={gradeA} net={netA} />
+            <span className='text-gray-500' aria-hidden>vs</span>
+            <TeamGradeRow teamName={entry.side_b.team_name} grade={gradeB} net={netB} />
+          </div>
+        </div>
         <div className='mt-3'>
           <KtcTradeComparison
             sideALabel={entry.side_a.team_name}
             sideBLabel={entry.side_b.team_name}
-            sideAValue={entry.side_b.ktc_subtotal}
-            sideBValue={entry.side_a.ktc_subtotal}
+            sideAValue={entry.side_b.consensus_subtotal}
+            sideBValue={entry.side_a.consensus_subtotal}
             sideAAssets={sideAReceives}
             sideBAssets={sideBReceives}
           />
         </div>
-      </div>
-
-      <div
-        className={
-          props.compact
-            ? 'mt-2 rounded-lg border border-white/10 bg-black/10 p-2'
-            : 'mt-2 rounded-xl border border-white/10 bg-black/10 p-3 sm:p-4'
-        }
-      >
-        <div className='text-xs font-semibold text-gray-200 sm:text-sm'>Summary</div>
-        <ul className='mt-2 list-disc space-y-1 pl-5 text-xs text-gray-300 sm:text-sm'>
-          {res.summary_bullets.map((s) => (
-            <li key={s}>{s}</li>
-          ))}
-        </ul>
       </div>
 
       <div className='mt-2 grid grid-cols-1 gap-3 md:grid-cols-2'>
@@ -188,12 +205,14 @@ export function AnalysisResultsPanel(props: {
           teamSubtitle={entry.side_a.team_subtitle}
           grade={gradeA}
           data={res.side_a}
+          summaryBullet={res.summary_bullets[0]}
         />
         <ResultsColumn
           teamName={entry.side_b.team_name}
           teamSubtitle={entry.side_b.team_subtitle}
           grade={gradeB}
           data={res.side_b}
+          summaryBullet={res.summary_bullets[1]}
         />
       </div>
 
